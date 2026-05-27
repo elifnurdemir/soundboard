@@ -39,8 +39,24 @@ export default function App() {
     else html.classList.remove('dark');
   }, [settings.theme]);
 
-  // Global keyboard shortcuts
+  // Global keyboard shortcuts — register with Electron for OS-wide hotkeys
   useEffect(() => {
+    if (window.electronAPI) {
+      const withShortcut = sounds.filter((s) => s.shortcut);
+      window.electronAPI.registerShortcuts(
+        withShortcut.map((s) => ({ soundId: s.id, shortcut: s.shortcut }))
+      );
+      window.electronAPI.offShortcutTriggered();
+      window.electronAPI.onShortcutTriggered((soundId) => {
+        const sound = useSoundStore.getState().sounds.find((s) => s.id === soundId);
+        if (!sound) return;
+        const isPlaying = !!(useSoundStore.getState().playingSounds[sound.id]?.length);
+        if (isPlaying) stopSoundWithFade(sound.id, sound);
+        else playSound(sound);
+      });
+      return () => window.electronAPI.unregisterShortcuts();
+    }
+    // Fallback for browser mode
     const handler = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
       for (const sound of sounds) {
@@ -56,7 +72,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [sounds, playingSounds, playSound, stopSoundWithFade]);
+  }, [sounds, playSound, stopSoundWithFade]);
 
   // Twitch chat command listener
   useEffect(() => {

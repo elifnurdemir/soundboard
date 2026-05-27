@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import useSoundStore from '../store/useSoundStore';
+import useSoundStore, { adaptColorForTheme } from '../store/useSoundStore';
 
 function PlayingBars() {
   return (
@@ -37,7 +37,10 @@ export default function SoundButton({ sound }) {
   const {
     playSound, stopSoundWithFade, playingSounds,
     updateSound, openAddModal, deleteSound, getCooldownProgress,
+    settings,
   } = useSoundStore();
+
+  const displayColor = adaptColorForTheme(sound.color, settings.theme);
 
   const isPlaying = !!(playingSounds[sound.id]?.length);
   const instanceCount = playingSounds[sound.id]?.length || 0;
@@ -88,7 +91,7 @@ export default function SoundButton({ sound }) {
     instances.forEach(({ audio }) => { audio.volume = Math.min(1, vol * gv); });
   };
 
-  const { r, g, b } = hexToRgb(sound.color || '#c4ff00');
+  const { r, g, b } = hexToRgb(displayColor || '#c4ff00');
   const bright = (r * 299 + g * 587 + b * 114) / 1000;
   const textColor = bright > 140 ? 'text-black/80' : 'text-white';
   const isOnCooldown = sound.cooldown > 0 && cooldown < 1;
@@ -127,31 +130,31 @@ export default function SoundButton({ sound }) {
           focus:outline-none
         `}
         style={{
-          backgroundColor: sound.color,
+          backgroundColor: displayColor,
           backgroundImage: sound.image ? `url(file:///${sound.image.replace(/\\/g, '/')})` : undefined,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           boxShadow: isPlaying
-            ? `0 0 24px ${sound.color}70, 0 4px 16px rgba(0,0,0,0.6), inset 0 0 18px ${sound.color}25, inset 0 1px 0 rgba(255,255,255,0.2)`
+            ? `0 0 24px ${displayColor}70, 0 4px 16px rgba(0,0,0,0.6), inset 0 0 18px ${displayColor}25, inset 0 1px 0 rgba(255,255,255,0.2)`
             : '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
         }}
         title={`${sound.name}${sound.shortcut ? ` [${sound.shortcut}]` : ''}`}
       >
         {/* Image color overlay — keeps text readable */}
         {sound.image && (
-          <div className="absolute inset-0 pointer-events-none" style={{ background: `${sound.color}99` }}/>
+          <div className="absolute inset-0 pointer-events-none" style={{ background: `${displayColor}99` }}/>
         )}
         {/* Shine overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/12 to-transparent pointer-events-none"/>
         {/* Sonar circles — contained by button's overflow:hidden */}
         {isPlaying && (
           <>
-            <div className="playing-inner-sonar-1" style={{ background: `${sound.color}55` }}/>
-            <div className="playing-inner-sonar-2" style={{ background: `${sound.color}40` }}/>
-            <div className="playing-inner-sonar-3" style={{ background: `${sound.color}30` }}/>
+            <div className="playing-inner-sonar-1" style={{ background: `${displayColor}55` }}/>
+            <div className="playing-inner-sonar-2" style={{ background: `${displayColor}40` }}/>
+            <div className="playing-inner-sonar-3" style={{ background: `${displayColor}30` }}/>
             {/* scan line */}
             <div className="playing-scan absolute top-0 bottom-0 w-1/3 pointer-events-none z-10"
-              style={{ background: `linear-gradient(to right, transparent, ${sound.color}45, transparent)` }}
+              style={{ background: `linear-gradient(to right, transparent, ${displayColor}45, transparent)` }}
             />
           </>
         )}

@@ -3,10 +3,47 @@ import { v4 as uuidv4 } from 'uuid';
 import { voiceChatRouter } from '../audio/VoiceChatRouter';
 
 export const PRESET_COLORS = [
-  '#ef4444', '#f97316', '#f59e0b', '#84cc16',
-  '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
-  '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e',
+  '#7d2626', '#7d4220', '#7a5010', '#4a6318',
+  '#1d6638', '#1a6060', '#1a4e78', '#1c3882',
+  '#2e2882', '#521878', '#7a1e62', '#7a1e2e',
 ];
+
+// ─── Color utilities ─────────────────────────────────────────────────────────
+function hexToHsl(hex) {
+  let r = parseInt(hex.slice(1,3),16)/255;
+  let g = parseInt(hex.slice(3,5),16)/255;
+  let b = parseInt(hex.slice(5,7),16)/255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
+  let h,s,l=(max+min)/2;
+  if(max===min){h=s=0;}else{
+    const d=max-min;
+    s=l>0.5?d/(2-max-min):d/(max+min);
+    switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;}
+    h/=6;
+  }
+  return{h:Math.round(h*360),s:Math.round(s*100),l:Math.round(l*100)};
+}
+function hslToHex(h,s,l){
+  s/=100;l/=100;
+  const a=s*Math.min(l,1-l);
+  const f=n=>{const k=(n+h/30)%12;const c=l-a*Math.max(Math.min(k-3,9-k,1),-1);return Math.round(255*c).toString(16).padStart(2,'0');};
+  return`#${f(0)}${f(8)}${f(4)}`;
+}
+
+export function randomColor(theme='dark'){
+  const h=Math.floor(Math.random()*360);
+  const s=42+Math.floor(Math.random()*28); // 42–70%
+  const l=theme==='dark'
+    ?22+Math.floor(Math.random()*22)  // 22–44%
+    :44+Math.floor(Math.random()*22); // 44–66%
+  return hslToHex(h,s,l);
+}
+
+export function adaptColorForTheme(hex, theme){
+  if(!hex||theme!=='light') return hex;
+  const{h,s,l}=hexToHsl(hex);
+  return hslToHex(h, Math.min(80,s+10), Math.min(68,l+28));
+}
 
 const DEFAULT_SETTINGS = {
   globalVolume: 1,
@@ -128,7 +165,7 @@ const useSoundStore = create((set, get) => ({
       id: uuidv4(),
       name: data.name || 'Yeni Ses',
       filePath: data.filePath,
-      color: data.color || PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)],
+      color: data.color || randomColor(get().settings.theme),
       volume: data.volume ?? 0.8,
       shortcut: data.shortcut || '',
       categoryId: data.categoryId || 'default',
@@ -175,7 +212,7 @@ const useSoundStore = create((set, get) => ({
 
   // ─── Categories ──────────────────────────────────────────────────────────
   addCategory: (name) => {
-    const c = { id: uuidv4(), name, color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)] };
+    const c = { id: uuidv4(), name, color: randomColor(get().settings.theme) };
     set((state) => ({ categories: [...state.categories, c] }));
     get().saveData();
     return c;

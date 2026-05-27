@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import useSoundStore, { PRESET_COLORS } from '../store/useSoundStore';
+import useSoundStore, { PRESET_COLORS, randomColor } from '../store/useSoundStore';
 import WaveformDisplay from './WaveformDisplay';
 
 function ColorPicker({ value, onChange }) {
@@ -116,14 +116,14 @@ function Toggle({ value, onChange, label, description }) {
 }
 
 export default function AddSoundModal() {
-  const { categories, addSound, updateSound, editingSound, closeAddModal } = useSoundStore();
+  const { categories, addSound, updateSound, editingSound, closeAddModal, settings } = useSoundStore();
   const isEditing = !!editingSound;
 
   const [filePath, setFilePath] = useState(editingSound?.filePath || '');
   const [fileName, setFileName] = useState(editingSound ? editingSound.filePath.split(/[\\/]/).pop() : '');
   const [imagePath, setImagePath] = useState(editingSound?.image || '');
   const [name, setName] = useState(editingSound?.name || '');
-  const [color, setColor] = useState(editingSound?.color || PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
+  const [color, setColor] = useState(editingSound?.color || randomColor(useSoundStore.getState().settings.theme));
   const [volume, setVolume] = useState(editingSound?.volume ?? 0.8);
   const [shortcut, setShortcut] = useState(editingSound?.shortcut || '');
   const [categoryId, setCategoryId] = useState(editingSound?.categoryId || 'default');
@@ -180,7 +180,7 @@ export default function AddSoundModal() {
       addSound({
         name: fn.replace(/\.[^.]+$/, ''),
         filePath: fp,
-        color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)],
+        color: randomColor(useSoundStore.getState().settings.theme),
         volume: 0.8,
         categoryId: categoryId,
       });

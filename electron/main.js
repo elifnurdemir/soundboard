@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, Tray, Menu, nativeImage, shell, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
@@ -293,6 +293,39 @@ ipcMain.handle('app-quit', () => {
   tray?.destroy();
   app.quit();
 });
+
+// ─── Global Shortcuts ─────────────────────────────────────────────────────────
+function toAccelerator(shortcut) {
+  if (!shortcut) return null;
+  return shortcut.split('+').map((p) => {
+    const t = p.trim();
+    if (t.toLowerCase() === 'ctrl') return 'Ctrl';
+    if (t.toLowerCase() === 'alt') return 'Alt';
+    if (t.toLowerCase() === 'shift') return 'Shift';
+    return t.length === 1 ? t.toUpperCase() : t;
+  }).join('+');
+}
+
+ipcMain.handle('register-shortcuts', (_, shortcuts) => {
+  globalShortcut.unregisterAll();
+  for (const { soundId, shortcut } of shortcuts) {
+    const accel = toAccelerator(shortcut);
+    if (!accel) continue;
+    try {
+      globalShortcut.register(accel, () => {
+        mainWindow?.webContents.send('shortcut-triggered', soundId);
+      });
+    } catch (err) {
+      console.warn('Could not register shortcut:', accel, err.message);
+    }
+  }
+});
+
+ipcMain.handle('unregister-shortcuts', () => {
+  globalShortcut.unregisterAll();
+});
+
+app.on('will-quit', () => globalShortcut.unregisterAll());
 
 // ─── Window Controls ──────────────────────────────────────────────────────────
 ipcMain.handle('window:minimize', () => mainWindow?.minimize());
