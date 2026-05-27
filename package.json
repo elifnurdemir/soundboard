@@ -27,6 +27,7 @@
       "package.json"
     ],
     "forceCodeSigning": false,
+    "npmRebuild": false,
     "publish": {
       "provider": "github",
       "owner": "elifnurdemir",
