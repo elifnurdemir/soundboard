@@ -31,7 +31,8 @@
     "publish": {
       "provider": "github",
       "owner": "elifnurdemir",
-      "repo": "soundboard"
+      "repo": "soundboard",
+      "releaseType": "release"
     },
     "win": {
       "target": [
