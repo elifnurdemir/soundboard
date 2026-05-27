@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "dist": "vite build && electron-builder --win --x64",
     "dist:dir": "vite build && electron-builder --win --x64 --dir",
-    "release": "vite build && electron-builder --win --x64 --publish always"
+    "release": "npm version patch --no-git-tag-version && vite build && electron-builder --win --x64 --publish always"
   },
   "build": {
     "appId": "com.soundboard.app",
