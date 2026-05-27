@@ -1,6 +1,6 @@
 {
   "name": "soundboard",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "description": "Soundboard Desktop Application",
   "main": "electron/main.js",
   "scripts": {
@@ -12,7 +12,8 @@
     "dist": "vite build && electron-builder --win --x64",
     "dist:dir": "vite build && electron-builder --win --x64 --dir",
     "icon": "node scripts/generate-icon.js",
-    "release": "npm version patch --no-git-tag-version && node scripts/generate-icon.js && vite build && electron-builder --win --x64 --publish always"
+    "clean-release": "node scripts/clean-release.js",
+    "release": "npm version patch --no-git-tag-version && node scripts/clean-release.js && node scripts/generate-icon.js && vite build && electron-builder --win --x64 --publish always"
   },
   "build": {
     "appId": "com.soundboard.app",

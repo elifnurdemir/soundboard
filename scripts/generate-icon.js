@@ -108,33 +108,65 @@ function drawIcon(x, y, size) {
   return COLORS.bg;
 }
 
-function createICO(images) {
+// Convert pixel draw function output to BMP DIB (no file header) for ICO embedding
+function createBMPDIB(size, drawFn) {
+  // BITMAPINFOHEADER — 40 bytes
+  const hdr = Buffer.alloc(40);
+  hdr.writeUInt32LE(40, 0);       // biSize
+  hdr.writeInt32LE(size, 4);      // biWidth
+  hdr.writeInt32LE(size * 2, 8);  // biHeight (doubled — includes AND mask)
+  hdr.writeUInt16LE(1, 12);       // biPlanes
+  hdr.writeUInt16LE(32, 14);      // biBitCount
+  // rest zero (BI_RGB, no compression)
+
+  // Pixel data: BGRA, bottom-up
+  const pixels = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const [r, g, b, a = 255] = drawFn(x, y, size);
+      const idx = ((size - 1 - y) * size + x) * 4;
+      pixels[idx]     = b;
+      pixels[idx + 1] = g;
+      pixels[idx + 2] = r;
+      pixels[idx + 3] = a;
+    }
+  }
+
+  // AND mask: all zeros (opaque), bottom-up, rows padded to 4 bytes
+  const rowBytes = Math.ceil(size / 32) * 4;
+  const mask = Buffer.alloc(size * rowBytes, 0);
+
+  return Buffer.concat([hdr, pixels, mask]);
+}
+
+function createICO(sizes, drawFn) {
+  const images = sizes.map(size => ({ size, data: createBMPDIB(size, drawFn) }));
+
   const header = Buffer.alloc(6);
   header.writeUInt16LE(0, 0);
   header.writeUInt16LE(1, 2);
   header.writeUInt16LE(images.length, 4);
 
   let dataOffset = 6 + images.length * 16;
-  const dirs = images.map(({ size, png }) => {
+  const dirs = images.map(({ size, data }) => {
     const dir = Buffer.alloc(16);
     dir[0] = size >= 256 ? 0 : size;
     dir[1] = size >= 256 ? 0 : size;
     dir[2] = 0; dir[3] = 0;
     dir.writeUInt16LE(1, 4);
     dir.writeUInt16LE(32, 6);
-    dir.writeUInt32LE(png.length, 8);
+    dir.writeUInt32LE(data.length, 8);
     dir.writeUInt32LE(dataOffset, 12);
-    dataOffset += png.length;
+    dataOffset += data.length;
     return dir;
   });
 
-  return Buffer.concat([header, ...dirs, ...images.map(i => i.png)]);
+  return Buffer.concat([header, ...dirs, ...images.map(i => i.data)]);
 }
 
-const sizes = [16, 32, 48, 64, 128, 256];
-const pngs = sizes.map(size => ({ size, png: createPNG(size, drawIcon) }));
-const ico = createICO(pngs);
-const png256 = pngs.find(p => p.size === 256).png;
+const icoSizes = [16, 32, 48, 64, 128, 256];
+const ico = createICO(icoSizes, drawIcon);
+const png256 = createPNG(256, drawIcon);
 
 const root = path.join(__dirname, '..');
 

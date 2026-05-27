@@ -40,7 +40,20 @@ export default function Header() {
     <header className="titlebar-drag flex items-center gap-2 px-3 py-2 bg-app-bg border-b border-app-border select-none z-10 shrink-0">
       {/* Logo */}
       <div className="flex items-center gap-2 titlebar-no-drag shrink-0">
-        <img src="/icon.png" className="w-7 h-7" style={{ imageRendering: 'pixelated' }} alt="logo" />
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+          <rect width="26" height="26" fill="#0b0d0b"/>
+          {/* 3x3 pad grid */}
+          {[0,1,2].map(row => [0,1,2].map(col => {
+            const x = 2 + col * 8, y = 2 + row * 8;
+            const isLime = row === col;
+            const isMed = (row === 0 && col === 1) || (row === 1 && col === 2) || (row === 2 && col === 0);
+            return (
+              <rect key={`${row}-${col}`} x={x} y={y} width="6" height="6" rx="1"
+                fill={isLime ? '#c4ff00' : isMed ? '#2a5a2a' : '#1a2a1a'}
+              />
+            );
+          }))}
+        </svg>
         <span className="font-bold text-white text-sm tracking-widest uppercase font-mono">SOUNDBOARD</span>
       </div>
 
