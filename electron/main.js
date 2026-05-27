@@ -19,8 +19,13 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
+// ─── Single instance lock ─────────────────────────────────────────────────────
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) { app.exit(0); }
+
 let mainWindow;
 let tray = null;
+let isQuitting = false;
 
 // ─── Programmatic 16x16 PNG icon (lime #c4ff00) ───────────────────────────────
 function makeTrayIcon() {
@@ -61,7 +66,7 @@ function createTray() {
       else { mainWindow.show(); mainWindow.focus(); }
     }},
     { type: 'separator' },
-    { label: 'Çıkış Yap', click: () => { tray?.destroy(); app.quit(); } },
+    { label: 'Çıkış Yap', click: () => { isQuitting = true; tray?.destroy(); app.quit(); } },
   ]);
   tray.setContextMenu(menu);
   tray.on('click', () => {
@@ -95,10 +100,11 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
-  // Hide to tray instead of closing
   mainWindow.on('close', (e) => {
-    e.preventDefault();
-    mainWindow.hide();
+    if (!isQuitting) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
   });
 }
 
@@ -142,6 +148,10 @@ app.whenReady().then(() => {
 
   createWindow();
   createTray();
+
+  app.on('second-instance', () => {
+    if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
+  });
 
   app.on('activate', () => {
     if (mainWindow) mainWindow.show();
@@ -290,6 +300,7 @@ ipcMain.handle('open-sounds-folder', () => {
 });
 
 ipcMain.handle('app-quit', () => {
+  isQuitting = true;
   tray?.destroy();
   app.quit();
 });

@@ -25,6 +25,7 @@
       "electron/**/*",
       "package.json"
     ],
+    "forceCodeSigning": false,
     "win": {
       "target": [
         { "target": "nsis", "arch": ["x64"] }
