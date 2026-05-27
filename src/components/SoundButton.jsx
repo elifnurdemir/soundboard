@@ -128,12 +128,19 @@ export default function SoundButton({ sound }) {
         `}
         style={{
           backgroundColor: sound.color,
+          backgroundImage: sound.image ? `url(file:///${sound.image.replace(/\\/g, '/')})` : undefined,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
           boxShadow: isPlaying
             ? `0 0 24px ${sound.color}70, 0 4px 16px rgba(0,0,0,0.6), inset 0 0 18px ${sound.color}25, inset 0 1px 0 rgba(255,255,255,0.2)`
             : '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
         }}
         title={`${sound.name}${sound.shortcut ? ` [${sound.shortcut}]` : ''}`}
       >
+        {/* Image color overlay — keeps text readable */}
+        {sound.image && (
+          <div className="absolute inset-0 pointer-events-none" style={{ background: `${sound.color}99` }}/>
+        )}
         {/* Shine overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/12 to-transparent pointer-events-none"/>
         {/* Sonar circles — contained by button's overflow:hidden */}

@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyFile: (srcPath) => ipcRenderer.invoke('copy-sound-file', srcPath),
   getSoundsFolder: () => ipcRenderer.invoke('get-sounds-folder'),
   openSoundsFolder: () => ipcRenderer.invoke('open-sounds-folder'),
+  openImageDialog: () => ipcRenderer.invoke('open-image-dialog'),
+  copyImageFile: (srcPath) => ipcRenderer.invoke('copy-image-file', srcPath),
   openFolderDialog: () => ipcRenderer.invoke('open-folder-dialog'),
   listAudioFiles: (folderPath) => ipcRenderer.invoke('list-audio-files', folderPath),
   quitApp: () => ipcRenderer.invoke('app-quit'),

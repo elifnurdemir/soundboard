@@ -121,6 +121,7 @@ export default function AddSoundModal() {
 
   const [filePath, setFilePath] = useState(editingSound?.filePath || '');
   const [fileName, setFileName] = useState(editingSound ? editingSound.filePath.split(/[\\/]/).pop() : '');
+  const [imagePath, setImagePath] = useState(editingSound?.image || '');
   const [name, setName] = useState(editingSound?.name || '');
   const [color, setColor] = useState(editingSound?.color || PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
   const [volume, setVolume] = useState(editingSound?.volume ?? 0.8);
@@ -187,10 +188,18 @@ export default function AddSoundModal() {
     closeAddModal();
   };
 
+  const handleImageSelect = async () => {
+    if (!window.electronAPI) return;
+    const result = await window.electronAPI.openImageDialog();
+    if (result.canceled || !result.filePaths.length) return;
+    const copyResult = await window.electronAPI.copyImageFile(result.filePaths[0]);
+    setImagePath(copyResult.success ? copyResult.destPath : result.filePaths[0]);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!filePath && !isEditing) return;
-    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, cooldown, overlap, chatCommand };
+    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, cooldown, overlap, chatCommand, image: imagePath || '' };
     if (filePath) data.filePath = filePath;
     if (isEditing) updateSound(editingSound.id, data);
     else addSound({ ...data, filePath });
@@ -307,6 +316,40 @@ export default function AddSoundModal() {
                 <div>
                   <label className={labelCls} style={{ color: '#8e9c8b' }}>Renk</label>
                   <ColorPicker value={color} onChange={setColor}/>
+                </div>
+
+                {/* Background image */}
+                <div>
+                  <label className={labelCls} style={{ color: '#8e9c8b' }}>Arka Plan Görseli</label>
+                  <div className="flex gap-2 items-center">
+                    <button
+                      type="button" onClick={handleImageSelect}
+                      className="flex-1 flex items-center gap-2 px-3 py-2 bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] transition-all text-left"
+                    >
+                      {imagePath ? (
+                        <img
+                          src={`file:///${imagePath.replace(/\\/g, '/')}`}
+                          className="w-8 h-8 object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 flex items-center justify-center shrink-0 bg-app-raised border border-app-border">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5c665a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                          </svg>
+                        </div>
+                      )}
+                      <span className="text-xs font-mono" style={{ color: imagePath ? 'var(--accent)' : '#5c665a' }}>
+                        {imagePath ? imagePath.split(/[\\/]/).pop() : 'Görsel seç...'}
+                      </span>
+                    </button>
+                    {imagePath && (
+                      <button
+                        type="button" onClick={() => setImagePath('')}
+                        className="px-2 py-2 bg-app-input border border-app-border hover:bg-red-600/20 text-[#5c665a] hover:text-red-400 transition-colors text-xs"
+                      >✕</button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Category + preview */}

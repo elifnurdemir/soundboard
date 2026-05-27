@@ -191,6 +191,40 @@ ipcMain.handle('open-file-dialog', async () => {
   });
 });
 
+ipcMain.handle('open-image-dialog', async () => {
+  if (!mainWindow) return { canceled: true, filePaths: [] };
+  return dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'Görseller', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
+    ],
+  });
+});
+
+ipcMain.handle('copy-image-file', async (_, srcPath) => {
+  try {
+    const folder = path.join(app.getPath('userData'), 'images');
+    if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
+    const ext = path.extname(srcPath);
+    const base = path.basename(srcPath, ext);
+    let destName = path.basename(srcPath);
+    let destPath = path.join(folder, destName);
+    let counter = 1;
+    while (fs.existsSync(destPath) && !sameFile(srcPath, destPath)) {
+      destName = `${base}_${counter}${ext}`;
+      destPath = path.join(folder, destName);
+      counter++;
+    }
+    if (!fs.existsSync(destPath)) {
+      fs.copyFileSync(srcPath, destPath);
+      try { fs.unlinkSync(srcPath); } catch (_) {}
+    }
+    return { success: true, destPath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 ipcMain.handle('open-folder-dialog', async () => {
   if (!mainWindow) return { canceled: true, filePaths: [] };
   return dialog.showOpenDialog(mainWindow, {
@@ -235,6 +269,7 @@ ipcMain.handle('copy-sound-file', async (_, srcPath) => {
     }
     if (!fs.existsSync(destPath)) {
       fs.copyFileSync(srcPath, destPath);
+      try { fs.unlinkSync(srcPath); } catch (_) {}
     }
     return { success: true, destPath };
   } catch (err) {
