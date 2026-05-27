@@ -62,10 +62,6 @@ export default function SoundGrid() {
   }, [reorderSounds]);
 
   const cols = settings.gridColumns || 5;
-  const gridColsClass = {
-    3: 'grid-cols-3', 4: 'grid-cols-4', 5: 'grid-cols-5',
-    6: 'grid-cols-6', 7: 'grid-cols-7', 8: 'grid-cols-8',
-  }[cols] || 'grid-cols-5';
 
   if (filteredSounds.length === 0) {
     return <EmptyState onAdd={() => openAddModal()} isFiltered={isFiltered} />;
@@ -74,7 +70,7 @@ export default function SoundGrid() {
   const renderGrid = (sounds) => (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={sounds.map((s) => s.id)} strategy={rectSortingStrategy}>
-        <div className={`grid ${gridColsClass} gap-3`}>
+        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {sounds.map((sound) => <SoundButton key={sound.id} sound={sound} />)}
         </div>
       </SortableContext>
