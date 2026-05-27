@@ -20,6 +20,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   unregisterShortcuts: () => ipcRenderer.invoke('unregister-shortcuts'),
   onShortcutTriggered: (cb) => ipcRenderer.on('shortcut-triggered', (_, soundId) => cb(soundId)),
   offShortcutTriggered: () => ipcRenderer.removeAllListeners('shortcut-triggered'),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  onUpdateAvailable: (cb) => ipcRenderer.on('update-available', (_, info) => cb(info)),
+  onUpdateProgress: (cb) => ipcRenderer.on('update-progress', (_, p) => cb(p)),
+  onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', () => cb()),
 
   // Window controls
   minimize: () => ipcRenderer.invoke('window:minimize'),

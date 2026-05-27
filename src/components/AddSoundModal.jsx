@@ -31,7 +31,6 @@ function ShortcutInput({ value, onChange }) {
   const [recording, setRecording] = useState(false);
   const inputRef = useRef(null);
 
-  // Use capture-phase window listener so we intercept before other handlers (e.g. modal Escape)
   useEffect(() => {
     if (!recording) return;
 
@@ -39,10 +38,7 @@ function ShortcutInput({ value, onChange }) {
       e.preventDefault();
       e.stopImmediatePropagation();
 
-      if (e.key === 'Escape') {
-        setRecording(false);
-        return;
-      }
+      if (e.key === 'Escape') { setRecording(false); return; }
 
       const parts = [];
       if (e.ctrlKey) parts.push('Ctrl');
@@ -51,11 +47,12 @@ function ShortcutInput({ value, onChange }) {
       const key = e.key;
       if (['Control', 'Alt', 'Shift', 'Meta'].includes(key)) return;
       parts.push(key.length === 1 ? key.toUpperCase() : key);
+
       onChange(parts.join('+'));
       setRecording(false);
     };
 
-    window.addEventListener('keydown', handleKeyDown, true); // capture phase
+    window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [recording, onChange]);
 
@@ -65,31 +62,33 @@ function ShortcutInput({ value, onChange }) {
   };
 
   return (
-    <div className="flex gap-2">
-      <input
-        ref={inputRef}
-        readOnly
-        value={recording ? '⌨ Tuşa bas...' : (value || '')}
-        onBlur={() => setRecording(false)}
-        onClick={startRecording}
-        placeholder="Kısayol yok"
-        className={`flex-1 bg-app-input px-3 py-2 text-sm text-white outline-none font-mono placeholder-[#3c4238] cursor-pointer ${
-          recording
-            ? 'border border-[rgba(196,255,0,0.6)] animate-pulse'
+    <div className="space-y-1.5">
+      <div className="flex gap-2">
+        <input
+          ref={inputRef}
+          readOnly
+          value={recording ? '⌨ Tuşa bas...' : (value || '')}
+          onBlur={() => setRecording(false)}
+          onClick={startRecording}
+          placeholder="Kısayol yok"
+          className={`flex-1 bg-app-input px-3 py-2 text-sm text-white outline-none font-mono placeholder-[#3c4238] cursor-pointer ${
+            recording ? 'border border-[rgba(196,255,0,0.6)] animate-pulse'
             : 'border border-app-border focus-lime'
-        }`}
-      />
-      <button
-        type="button" onClick={startRecording}
-        className="px-3 py-2 bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] text-[#8e9c8b] hover:text-[#c4ff00] text-sm transition-colors"
-        title="Kısayol Kaydet"
-      >⌨</button>
-      {value && (
+          }`}
+        />
         <button
-          type="button" onClick={() => onChange('')}
-          className="px-3 py-2 bg-app-input border border-app-border hover:bg-red-600/20 text-[#5c665a] hover:text-red-400 text-sm"
-        >✕</button>
-      )}
+          type="button" onClick={startRecording}
+          className="px-3 py-2 bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] text-[#8e9c8b] hover:text-[#c4ff00] text-sm transition-colors"
+          title="Kısayol Kaydet"
+        >⌨</button>
+        {value && (
+          <button
+            type="button" onClick={() => onChange('')}
+            className="px-3 py-2 bg-app-input border border-app-border hover:bg-red-600/20 text-[#5c665a] hover:text-red-400 text-sm"
+          >✕</button>
+        )}
+      </div>
+      <p className="text-[10px] font-mono" style={{ color: '#3c4238' }}>Örn: 8, F5, Ctrl+1, Alt+F9</p>
     </div>
   );
 }
@@ -328,7 +327,7 @@ export default function AddSoundModal() {
                     >
                       {imagePath ? (
                         <img
-                          src={`file:///${imagePath.replace(/\\/g, '/')}`}
+                          src={`soundboard:///${imagePath.replace(/\\/g, '/').replace(/ /g, '%20')}`}
                           className="w-8 h-8 object-cover shrink-0"
                         />
                       ) : (

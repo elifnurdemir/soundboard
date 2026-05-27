@@ -1,4 +1,6 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol, Tray, Menu, nativeImage, shell, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, Tray, Menu, nativeImage, shell } = require('electron');
+const { uIOhook, UiohookKey } = require('uiohook-napi');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
@@ -122,12 +124,10 @@ app.whenReady().then(() => {
 
       const ext = path.extname(filePath).toLowerCase().replace('.', '');
       const mimeTypes = {
-        mp3: 'audio/mpeg',
-        wav: 'audio/wav',
-        ogg: 'audio/ogg',
-        flac: 'audio/flac',
-        m4a: 'audio/mp4',
-        aac: 'audio/aac',
+        mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg',
+        flac: 'audio/flac', m4a: 'audio/mp4', aac: 'audio/aac',
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
       };
       const mimeType = mimeTypes[ext] || 'audio/mpeg';
 
@@ -148,6 +148,11 @@ app.whenReady().then(() => {
 
   createWindow();
   createTray();
+  uIOhook.start();
+  // Check for updates 5 seconds after launch (only in packaged app)
+  if (app.isPackaged) {
+    setTimeout(() => autoUpdater.checkForUpdates(), 5000);
+  }
 
   app.on('second-instance', () => {
     if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
@@ -305,38 +310,97 @@ ipcMain.handle('app-quit', () => {
   app.quit();
 });
 
-// ─── Global Shortcuts ─────────────────────────────────────────────────────────
-function toAccelerator(shortcut) {
-  if (!shortcut) return null;
-  return shortcut.split('+').map((p) => {
-    const t = p.trim();
-    if (t.toLowerCase() === 'ctrl') return 'Ctrl';
-    if (t.toLowerCase() === 'alt') return 'Alt';
-    if (t.toLowerCase() === 'shift') return 'Shift';
-    return t.length === 1 ? t.toUpperCase() : t;
-  }).join('+');
+// ─── Global Shortcuts (uiohook — non-blocking, passes keys through) ──────────
+let registeredShortcuts = [];
+
+function getUiohookKeyCode(keyName) {
+  if (keyName === ' ') return UiohookKey.Space;
+  if (UiohookKey[keyName] !== undefined) return UiohookKey[keyName];
+  const extra = {
+    arrowup: UiohookKey.ArrowUp, arrowdown: UiohookKey.ArrowDown,
+    arrowleft: UiohookKey.ArrowLeft, arrowright: UiohookKey.ArrowRight,
+    pageup: UiohookKey.PageUp, pagedown: UiohookKey.PageDown,
+    home: UiohookKey.Home, end: UiohookKey.End,
+    insert: UiohookKey.Insert, delete: UiohookKey.Delete,
+    backspace: UiohookKey.Backspace, enter: UiohookKey.Enter,
+    escape: UiohookKey.Escape, tab: UiohookKey.Tab,
+  };
+  return extra[keyName.toLowerCase()];
 }
 
-ipcMain.handle('register-shortcuts', (_, shortcuts) => {
-  globalShortcut.unregisterAll();
-  for (const { soundId, shortcut } of shortcuts) {
-    const accel = toAccelerator(shortcut);
-    if (!accel) continue;
-    try {
-      globalShortcut.register(accel, () => {
-        mainWindow?.webContents.send('shortcut-triggered', soundId);
-      });
-    } catch (err) {
-      console.warn('Could not register shortcut:', accel, err.message);
+function parseShortcut(shortcut) {
+  if (!shortcut) return null;
+  const parts = shortcut.split('+').map((p) => p.trim());
+  const modifiers = {
+    ctrl:  parts.some((p) => p.toLowerCase() === 'ctrl'),
+    alt:   parts.some((p) => p.toLowerCase() === 'alt'),
+    shift: parts.some((p) => p.toLowerCase() === 'shift'),
+  };
+  const keyPart = parts.find((p) => !['ctrl','alt','shift'].includes(p.toLowerCase()));
+  if (!keyPart) return null;
+  const keyCode = getUiohookKeyCode(keyPart);
+  if (keyCode == null) return null;
+  return { modifiers, keyCode };
+}
+
+uIOhook.on('keydown', (e) => {
+  for (const { soundId, modifiers, keyCode } of registeredShortcuts) {
+    if (
+      e.keycode === keyCode &&
+      !!e.ctrlKey  === modifiers.ctrl &&
+      !!e.altKey   === modifiers.alt &&
+      !!e.shiftKey === modifiers.shift
+    ) {
+      mainWindow?.webContents.send('shortcut-triggered', soundId);
     }
   }
 });
 
-ipcMain.handle('unregister-shortcuts', () => {
-  globalShortcut.unregisterAll();
+ipcMain.handle('register-shortcuts', (_, shortcuts) => {
+  registeredShortcuts = shortcuts
+    .map(({ soundId, shortcut }) => {
+      const parsed = parseShortcut(shortcut);
+      return parsed ? { soundId, ...parsed } : null;
+    })
+    .filter(Boolean);
 });
 
-app.on('will-quit', () => globalShortcut.unregisterAll());
+ipcMain.handle('unregister-shortcuts', () => { registeredShortcuts = []; });
+
+app.on('will-quit', () => uIOhook.stop());
+
+// ─── Auto Updater ─────────────────────────────────────────────────────────────
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
+
+autoUpdater.on('update-available', (info) => {
+  mainWindow?.webContents.send('update-available', info);
+});
+
+autoUpdater.on('download-progress', (progress) => {
+  mainWindow?.webContents.send('update-progress', progress);
+});
+
+autoUpdater.on('update-downloaded', () => {
+  mainWindow?.webContents.send('update-downloaded');
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('AutoUpdater error:', err.message);
+});
+
+ipcMain.handle('check-for-updates', () => {
+  if (app.isPackaged) autoUpdater.checkForUpdates();
+});
+
+ipcMain.handle('download-update', () => {
+  autoUpdater.downloadUpdate();
+});
+
+ipcMain.handle('install-update', () => {
+  isQuitting = true;
+  autoUpdater.quitAndInstall();
+});
 
 // ─── Window Controls ──────────────────────────────────────────────────────────
 ipcMain.handle('window:minimize', () => mainWindow?.minimize());

@@ -131,7 +131,7 @@ export default function SoundButton({ sound }) {
         `}
         style={{
           backgroundColor: displayColor,
-          backgroundImage: sound.image ? `url(file:///${sound.image.replace(/\\/g, '/')})` : undefined,
+          backgroundImage: sound.image ? `url("soundboard:///${sound.image.replace(/\\/g, '/').replace(/ /g, '%20')}")` : undefined,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           boxShadow: isPlaying
