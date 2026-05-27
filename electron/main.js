@@ -58,8 +58,14 @@ function makeTrayIcon() {
   return nativeImage.createFromBuffer(png);
 }
 
+function loadAppIcon() {
+  const iconPath = path.join(__dirname, 'icon.ico');
+  if (fs.existsSync(iconPath)) return nativeImage.createFromPath(iconPath);
+  return makeTrayIcon();
+}
+
 function createTray() {
-  tray = new Tray(makeTrayIcon());
+  tray = new Tray(loadAppIcon());
   tray.setToolTip('Soundboard');
   const menu = Menu.buildFromTemplate([
     { label: 'Göster / Gizle', click: () => {
@@ -85,6 +91,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     backgroundColor: '#0b0d0b',
+    icon: path.join(__dirname, 'icon.ico'),
     frame: false,
     titleBarStyle: 'hidden',
     webPreferences: {

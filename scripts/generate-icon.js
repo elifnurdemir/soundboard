@@ -133,12 +133,24 @@ function createICO(images) {
 
 const sizes = [16, 32, 48, 64, 128, 256];
 const pngs = sizes.map(size => ({ size, png: createPNG(size, drawIcon) }));
+const ico = createICO(pngs);
+const png256 = pngs.find(p => p.size === 256).png;
 
-const outDir = path.join(__dirname, '..', 'build-assets');
-fs.mkdirSync(outDir, { recursive: true });
+const root = path.join(__dirname, '..');
 
-fs.writeFileSync(path.join(outDir, 'icon.png'), pngs.find(p => p.size === 256).png);
-fs.writeFileSync(path.join(outDir, 'icon.ico'), createICO(pngs));
+// build-assets — used by electron-builder
+fs.mkdirSync(path.join(root, 'build-assets'), { recursive: true });
+fs.writeFileSync(path.join(root, 'build-assets', 'icon.png'), png256);
+fs.writeFileSync(path.join(root, 'build-assets', 'icon.ico'), ico);
 
-console.log('✓ build-assets/icon.png');
+// electron/ — bundled in asar, used by main.js at runtime
+fs.writeFileSync(path.join(root, 'electron', 'icon.ico'), ico);
+fs.writeFileSync(path.join(root, 'electron', 'icon.png'), png256);
+
+// public/ — served by Vite, used by React UI
+fs.mkdirSync(path.join(root, 'public'), { recursive: true });
+fs.writeFileSync(path.join(root, 'public', 'icon.png'), png256);
+
 console.log('✓ build-assets/icon.ico');
+console.log('✓ electron/icon.ico');
+console.log('✓ public/icon.png');
