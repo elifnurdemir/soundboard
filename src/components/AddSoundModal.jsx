@@ -132,6 +132,7 @@ export default function AddSoundModal() {
   const [cooldown, setCooldown] = useState(editingSound?.cooldown ?? 0);
   const [overlap, setOverlap] = useState(editingSound?.overlap ?? true);
   const [chatCommand, setChatCommand] = useState(editingSound?.chatCommand || '');
+  const [noColor, setNoColor] = useState(editingSound?.noColor ?? false);
   const [activeTab, setActiveTab] = useState('basic');
 
   const handleFileSelect = async () => {
@@ -198,7 +199,7 @@ export default function AddSoundModal() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!filePath && !isEditing) return;
-    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, cooldown, overlap, chatCommand, image: imagePath || '' };
+    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, cooldown, overlap, chatCommand, image: imagePath || '', noColor: imagePath ? noColor : false };
     if (filePath) data.filePath = filePath;
     if (isEditing) updateSound(editingSound.id, data);
     else addSound({ ...data, filePath });
@@ -350,6 +351,16 @@ export default function AddSoundModal() {
                     )}
                   </div>
                 </div>
+
+                {/* No color overlay toggle — only when image is set */}
+                {imagePath && (
+                  <Toggle
+                    value={noColor}
+                    onChange={() => setNoColor(v => !v)}
+                    label="Renk Kaplamasını Kaldır"
+                    description="Görsel tam görünsün, renk overlay'i gizle"
+                  />
+                )}
 
                 {/* Category + preview */}
                 <div className="flex gap-3 items-end">

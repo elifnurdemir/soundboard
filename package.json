@@ -1,6 +1,6 @@
 {
   "name": "soundboard",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Soundboard Desktop Application",
   "main": "electron/main.js",
   "scripts": {
@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "dist": "vite build && electron-builder --win --x64",
     "dist:dir": "vite build && electron-builder --win --x64 --dir",
-    "release": "npm version patch --no-git-tag-version && vite build && electron-builder --win --x64 --publish always"
+    "icon": "node scripts/generate-icon.js",
+    "release": "npm version patch --no-git-tag-version && node scripts/generate-icon.js && vite build && electron-builder --win --x64 --publish always"
   },
   "build": {
     "appId": "com.soundboard.app",
@@ -34,7 +35,9 @@
       "repo": "soundboard",
       "releaseType": "release"
     },
+    "icon": "build-assets/icon.ico",
     "win": {
+      "icon": "build-assets/icon.ico",
       "target": [
         {
           "target": "nsis",
