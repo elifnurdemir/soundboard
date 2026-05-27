@@ -25,10 +25,12 @@ function Row({ label, description, children }) {
 export default function SettingsPanel() {
   const { settings, updateSettings, closeSettings, sounds, categories } = useSoundStore();
   const [dataPath, setDataPath] = useState('');
+  const [soundsFolder, setSoundsFolder] = useState('');
 
   useEffect(() => {
     if (window.electronAPI) {
       window.electronAPI.getDataPath().then(setDataPath);
+      window.electronAPI.getSoundsFolder().then(setSoundsFolder);
     } else {
       setDataPath('localStorage (tarayıcı modu)');
     }
@@ -149,6 +151,24 @@ export default function SettingsPanel() {
               <p className="text-[10px] font-mono uppercase tracking-wider text-[#5c665a]">Veri Konumu</p>
               <p className="text-[10px] text-[#3c4238] break-all font-mono leading-relaxed">{dataPath || 'Yükleniyor...'}</p>
             </div>
+
+            {soundsFolder && (
+              <div className="p-3 bg-app-surface border border-app-border space-y-2">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-[#5c665a]">Ses Dosyaları Klasörü</p>
+                <p className="text-[10px] text-[#3c4238] break-all font-mono leading-relaxed">{soundsFolder}</p>
+                {window.electronAPI && (
+                  <button
+                    onClick={() => window.electronAPI.openSoundsFolder()}
+                    className="w-full flex items-center justify-center gap-2 py-2 bg-app-raised border border-app-border hover:border-[rgba(196,255,0,0.3)] text-[#8e9c8b] hover:text-[#c4ff00] text-xs font-bold font-mono tracking-wider transition-colors"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    KLASÖRÜ AÇ
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="p-3 bg-app-surface border border-app-border flex items-center justify-between">
               <p className="text-xs font-mono text-[#8e9c8b]">İstatistikler</p>

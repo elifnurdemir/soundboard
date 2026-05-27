@@ -160,10 +160,23 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-2 border-t border-app-border">
-        <p className="text-[10px] text-[#3c4238] text-center font-mono">
+      <div className="border-t border-app-border">
+        <p className="text-[10px] text-[#3c4238] text-center font-mono py-2">
           {allCount} SES · {categories.length} KATEGORİ
         </p>
+        {window.electronAPI && (
+          <button
+            onClick={() => window.electronAPI.quitApp()}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-[#5c665a] hover:text-red-400 hover:bg-red-600/10 border-t border-app-border transition-colors text-xs font-bold font-mono tracking-wider"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            ÇIKIŞ YAP
+          </button>
+        )}
       </div>
     </aside>
   );

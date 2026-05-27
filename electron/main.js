@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol, net } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, Tray, Menu, nativeImage, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const zlib = require('zlib');
 
 const isDev = !app.isPackaged;
 
@@ -19,6 +20,56 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow;
+let tray = null;
+
+// ─── Programmatic 16x16 PNG icon (lime #c4ff00) ───────────────────────────────
+function makeTrayIcon() {
+  function crc32(buf) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < buf.length; i++) {
+      c ^= buf[i];
+      for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function chunk(type, data) {
+    const t = Buffer.from(type, 'ascii');
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const crcBuf = Buffer.alloc(4); crcBuf.writeUInt32BE(crc32(Buffer.concat([t, data])));
+    return Buffer.concat([len, t, data, crcBuf]);
+  }
+  const sig = Buffer.from([137,80,78,71,13,10,26,10]);
+  const ihdrData = Buffer.alloc(13);
+  ihdrData.writeUInt32BE(16, 0); ihdrData.writeUInt32BE(16, 4);
+  ihdrData[8]=8; ihdrData[9]=2; // 8-bit RGB
+  const raw = Buffer.alloc(16*(1+48));
+  for (let y=0; y<16; y++) {
+    raw[y*49]=0; // filter: None
+    for (let x=0; x<16; x++) { const i=y*49+1+x*3; raw[i]=196; raw[i+1]=255; raw[i+2]=0; }
+  }
+  const png = Buffer.concat([sig, chunk('IHDR',ihdrData), chunk('IDAT',zlib.deflateSync(raw)), chunk('IEND',Buffer.alloc(0))]);
+  return nativeImage.createFromBuffer(png);
+}
+
+function createTray() {
+  tray = new Tray(makeTrayIcon());
+  tray.setToolTip('Soundboard');
+  const menu = Menu.buildFromTemplate([
+    { label: 'Göster / Gizle', click: () => {
+      if (!mainWindow) return;
+      if (mainWindow.isVisible()) mainWindow.hide();
+      else { mainWindow.show(); mainWindow.focus(); }
+    }},
+    { type: 'separator' },
+    { label: 'Çıkış Yap', click: () => { tray?.destroy(); app.quit(); } },
+  ]);
+  tray.setContextMenu(menu);
+  tray.on('click', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isVisible()) mainWindow.focus();
+    else { mainWindow.show(); mainWindow.focus(); }
+  });
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -44,8 +95,10 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  // Hide to tray instead of closing
+  mainWindow.on('close', (e) => {
+    e.preventDefault();
+    mainWindow.hide();
   });
 }
 
@@ -88,15 +141,15 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+  createTray();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (mainWindow) mainWindow.show();
   });
 });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+// Window is hidden, not destroyed — don't quit on all-closed
+app.on('window-all-closed', () => {});
 
 // ─── Data Storage ─────────────────────────────────────────────────────────────
 const getDataPath = () => path.join(app.getPath('userData'), 'soundboard-data.json');
@@ -136,6 +189,74 @@ ipcMain.handle('open-file-dialog', async () => {
       { name: 'Tüm Dosyalar', extensions: ['*'] },
     ],
   });
+});
+
+ipcMain.handle('open-folder-dialog', async () => {
+  if (!mainWindow) return { canceled: true, filePaths: [] };
+  return dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+  });
+});
+
+ipcMain.handle('list-audio-files', async (_, folderPath) => {
+  const AUDIO_EXT = new Set(['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac']);
+  try {
+    const entries = fs.readdirSync(folderPath, { withFileTypes: true });
+    return entries
+      .filter((e) => e.isFile() && AUDIO_EXT.has(path.extname(e.name).toLowerCase()))
+      .map((e) => path.join(folderPath, e.name));
+  } catch (err) {
+    return [];
+  }
+});
+
+// ─── Sounds Folder ────────────────────────────────────────────────────────────
+const getSoundsFolder = () => {
+  const folder = path.join(app.getPath('userData'), 'sounds');
+  if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
+  return folder;
+};
+
+ipcMain.handle('get-sounds-folder', () => getSoundsFolder());
+
+ipcMain.handle('copy-sound-file', async (_, srcPath) => {
+  try {
+    const folder = getSoundsFolder();
+    const ext = path.extname(srcPath);
+    const base = path.basename(srcPath, ext);
+    let destName = path.basename(srcPath);
+    let destPath = path.join(folder, destName);
+    // Avoid overwriting with a different file
+    let counter = 1;
+    while (fs.existsSync(destPath) && !sameFile(srcPath, destPath)) {
+      destName = `${base}_${counter}${ext}`;
+      destPath = path.join(folder, destName);
+      counter++;
+    }
+    if (!fs.existsSync(destPath)) {
+      fs.copyFileSync(srcPath, destPath);
+    }
+    return { success: true, destPath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+function sameFile(a, b) {
+  try {
+    const sa = fs.statSync(a), sb = fs.statSync(b);
+    return sa.size === sb.size && sa.mtimeMs === sb.mtimeMs;
+  } catch { return false; }
+}
+
+ipcMain.handle('open-sounds-folder', () => {
+  const folder = getSoundsFolder();
+  shell.openPath(folder);
+});
+
+ipcMain.handle('app-quit', () => {
+  tray?.destroy();
+  app.quit();
 });
 
 // ─── Window Controls ──────────────────────────────────────────────────────────

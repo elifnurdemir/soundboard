@@ -100,23 +100,55 @@ input[type="range"].volume-slider::-webkit-slider-thumb {
 }
 
 /* ─── Playing animations ───────────────────────────────────────────────── */
-@keyframes soundPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(0.96); }
+@keyframes brightnessBreath {
+  0%, 100% { filter: brightness(1);    }
+  50%       { filter: brightness(1.2); }
 }
-@keyframes ringPing {
-  75%, 100% { transform: scale(1.35); opacity: 0; }
+@keyframes innerSonar {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) scale(4); opacity: 0;   }
 }
-.playing-ring  { animation: ringPing 1.2s cubic-bezier(0, 0, 0.2, 1) infinite; }
-.playing-pulse { animation: soundPulse 0.8s ease-in-out infinite; }
+@keyframes insetPulse {
+  0%, 100% { box-shadow: var(--playing-shadow-lo); }
+  50%       { box-shadow: var(--playing-shadow-hi); }
+}
+@keyframes scanLine {
+  0%   { transform: translateX(-100%) skewX(-12deg); }
+  100% { transform: translateX(220%)  skewX(-12deg); }
+}
+
+.playing-pulse { animation: brightnessBreath 0.9s ease-in-out infinite; }
+.playing-scan  { animation: scanLine 2.2s linear infinite; }
+.playing-inner-sonar-1 {
+  position: absolute; top: 50%; left: 50%;
+  width: 28px; height: 28px; border-radius: 50%;
+  pointer-events: none; z-index: 5;
+  animation: innerSonar 1.5s ease-out infinite;
+}
+.playing-inner-sonar-2 {
+  position: absolute; top: 50%; left: 50%;
+  width: 28px; height: 28px; border-radius: 50%;
+  pointer-events: none; z-index: 5;
+  animation: innerSonar 1.5s ease-out infinite 0.5s;
+}
+.playing-inner-sonar-3 {
+  position: absolute; top: 50%; left: 50%;
+  width: 28px; height: 28px; border-radius: 50%;
+  pointer-events: none; z-index: 5;
+  animation: innerSonar 1.5s ease-out infinite 1s;
+}
 
 /* ─── Equalizer bars ───────────────────────────────────────────────────── */
-@keyframes eq1 { 0%,100%{height:3px}  50%{height:14px} }
-@keyframes eq2 { 0%,100%{height:7px}  50%{height:3px}  }
-@keyframes eq3 { 0%,100%{height:11px} 50%{height:18px} }
-.eq-bar-1 { animation: eq1 0.6s ease-in-out infinite; }
-.eq-bar-2 { animation: eq2 0.4s ease-in-out infinite; }
-.eq-bar-3 { animation: eq3 0.5s ease-in-out infinite; }
+@keyframes eq1 { 0%,100%{height:4px}  25%{height:18px} 75%{height:8px}  }
+@keyframes eq2 { 0%,100%{height:16px} 40%{height:4px}  70%{height:20px} }
+@keyframes eq3 { 0%,100%{height:10px} 30%{height:22px} 65%{height:5px}  }
+@keyframes eq4 { 0%,100%{height:6px}  35%{height:14px} 60%{height:3px}  }
+@keyframes eq5 { 0%,100%{height:14px} 20%{height:5px}  55%{height:19px} }
+.eq-bar-1 { animation: eq1 0.55s ease-in-out infinite; }
+.eq-bar-2 { animation: eq2 0.42s ease-in-out infinite; }
+.eq-bar-3 { animation: eq3 0.50s ease-in-out infinite; }
+.eq-bar-4 { animation: eq4 0.47s ease-in-out infinite; }
+.eq-bar-5 { animation: eq5 0.60s ease-in-out infinite; }
 
 /* ─── Fade-in ──────────────────────────────────────────────────────────── */
 @keyframes fadeIn {

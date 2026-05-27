@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { voiceChatRouter, VoiceChatRouter } from '../audio/VoiceChatRouter';
+import useSoundStore from './useSoundStore';
 
 const useVoiceChatStore = create((set, get) => ({
   enabled: false,
@@ -20,6 +21,7 @@ const useVoiceChatStore = create((set, get) => ({
   setVirtualDevice: async (deviceId) => {
     set({ virtualDeviceId: deviceId || null, error: null });
     voiceChatRouter.setVirtualDevice(deviceId || null);
+    useSoundStore.getState().updateSettings({ voiceDeviceId: deviceId || null });
     const { micPassthrough } = get();
     if (micPassthrough && deviceId) {
       try {

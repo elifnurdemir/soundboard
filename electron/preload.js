@@ -8,6 +8,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // File system
   openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
+  copyFile: (srcPath) => ipcRenderer.invoke('copy-sound-file', srcPath),
+  getSoundsFolder: () => ipcRenderer.invoke('get-sounds-folder'),
+  openSoundsFolder: () => ipcRenderer.invoke('open-sounds-folder'),
+  openFolderDialog: () => ipcRenderer.invoke('open-folder-dialog'),
+  listAudioFiles: (folderPath) => ipcRenderer.invoke('list-audio-files', folderPath),
+  quitApp: () => ipcRenderer.invoke('app-quit'),
 
   // Window controls
   minimize: () => ipcRenderer.invoke('window:minimize'),

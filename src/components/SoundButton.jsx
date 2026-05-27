@@ -5,9 +5,9 @@ import useSoundStore from '../store/useSoundStore';
 
 function PlayingBars() {
   return (
-    <div className="flex items-end gap-0.5 h-5">
-      {[0,1,2,3,4].map(i => (
-        <div key={i} className={`w-1 bg-white rounded-full eq-bar-${(i % 3) + 1}`} style={{ height: '3px' }} />
+    <div className="flex items-end gap-[3px] h-7">
+      {[1,2,3,4,5].map(i => (
+        <div key={i} className={`w-[3px] bg-current rounded-sm eq-bar-${i}`} style={{ height: '4px' }} />
       ))}
     </div>
   );
@@ -101,27 +101,6 @@ export default function SoundButton({ sound }) {
       onMouseEnter={() => { hoverTimer.current = setTimeout(() => setShowControls(true), 150); }}
       onMouseLeave={() => { clearTimeout(hoverTimer.current); setShowControls(false); }}
     >
-      {/* Playing corner brackets */}
-      {isPlaying && (
-        <>
-          <div className="absolute inset-0 pointer-events-none z-20" style={{
-            background: `
-              linear-gradient(to right, ${sound.color} 8px, transparent 8px) 0 0 / 8px 1.5px no-repeat,
-              linear-gradient(to bottom, ${sound.color} 8px, transparent 8px) 0 0 / 1.5px 8px no-repeat,
-              linear-gradient(to left, ${sound.color} 8px, transparent 8px) 100% 0 / 8px 1.5px no-repeat,
-              linear-gradient(to bottom, ${sound.color} 8px, transparent 8px) 100% 0 / 1.5px 8px no-repeat,
-              linear-gradient(to right, ${sound.color} 8px, transparent 8px) 0 100% / 8px 1.5px no-repeat,
-              linear-gradient(to top, ${sound.color} 8px, transparent 8px) 0 100% / 1.5px 8px no-repeat,
-              linear-gradient(to left, ${sound.color} 8px, transparent 8px) 100% 100% / 8px 1.5px no-repeat,
-              linear-gradient(to top, ${sound.color} 8px, transparent 8px) 100% 100% / 1.5px 8px no-repeat
-            `,
-          }}/>
-          <div
-            className="absolute inset-0 pointer-events-none playing-ring z-10"
-            style={{ border: `1.5px solid ${sound.color}40` }}
-          />
-        </>
-      )}
 
       {/* Drag handle */}
       {showControls && (
@@ -144,22 +123,30 @@ export default function SoundButton({ sound }) {
         className={`
           relative w-full aspect-square flex flex-col items-center justify-center
           gap-1.5 overflow-hidden transition-all duration-150 select-none
-          ${isPlaying ? 'playing-pulse scale-[0.96]' : isOnCooldown ? 'opacity-60 cursor-not-allowed' : 'hover:scale-[1.04] hover:brightness-110'}
+          ${isPlaying ? 'playing-pulse' : isOnCooldown ? 'opacity-60 cursor-not-allowed' : 'hover:scale-[1.04] hover:brightness-110'}
           focus:outline-none
         `}
         style={{
           backgroundColor: sound.color,
           boxShadow: isPlaying
-            ? `0 0 20px ${sound.color}60, 0 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15)`
+            ? `0 0 24px ${sound.color}70, 0 4px 16px rgba(0,0,0,0.6), inset 0 0 18px ${sound.color}25, inset 0 1px 0 rgba(255,255,255,0.2)`
             : '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
         }}
         title={`${sound.name}${sound.shortcut ? ` [${sound.shortcut}]` : ''}`}
       >
         {/* Shine overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/12 to-transparent pointer-events-none"/>
-        {/* Diagonal hatch when playing */}
+        {/* Sonar circles — contained by button's overflow:hidden */}
         {isPlaying && (
-          <div className="absolute inset-0 pointer-events-none hatch-bg opacity-30"/>
+          <>
+            <div className="playing-inner-sonar-1" style={{ background: `${sound.color}55` }}/>
+            <div className="playing-inner-sonar-2" style={{ background: `${sound.color}40` }}/>
+            <div className="playing-inner-sonar-3" style={{ background: `${sound.color}30` }}/>
+            {/* scan line */}
+            <div className="playing-scan absolute top-0 bottom-0 w-1/3 pointer-events-none z-10"
+              style={{ background: `linear-gradient(to right, transparent, ${sound.color}45, transparent)` }}
+            />
+          </>
         )}
 
         {/* Cooldown ring */}
@@ -173,7 +160,7 @@ export default function SoundButton({ sound }) {
         </div>
 
         {/* Name */}
-        <div className={`relative z-10 text-xs font-bold px-2 text-center leading-tight line-clamp-2 max-w-full font-mono tracking-wide ${textColor}`}>
+        <div className={`relative z-10 text-sm font-bold px-2 text-center leading-tight line-clamp-2 max-w-full font-mono tracking-wide ${textColor}`}>
           {sound.name}
         </div>
 
@@ -221,21 +208,21 @@ export default function SoundButton({ sound }) {
 
       {/* Edit/Delete */}
       {showControls && (
-        <div className="no-play absolute top-1 right-1 flex gap-0.5 z-30">
+        <div className="no-play absolute top-1.5 right-1.5 flex gap-1 z-30">
           <button
             onClick={(e) => { e.stopPropagation(); openAddModal(sound); }}
-            className="w-5 h-5 flex items-center justify-center bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white/70 hover:text-white transition-colors"
+            className="w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-black/85 backdrop-blur-sm text-white/80 hover:text-white transition-colors"
           >
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); deleteSound(sound.id); }}
-            className="w-5 h-5 flex items-center justify-center bg-black/50 hover:bg-red-600/70 backdrop-blur-sm text-white/70 hover:text-white transition-colors"
+            className="w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-red-600/80 backdrop-blur-sm text-white/80 hover:text-white transition-colors"
           >
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6"/>
               <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
             </svg>

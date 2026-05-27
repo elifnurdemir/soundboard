@@ -122,7 +122,7 @@ export default function AddSoundModal() {
   const [filePath, setFilePath] = useState(editingSound?.filePath || '');
   const [fileName, setFileName] = useState(editingSound ? editingSound.filePath.split(/[\\/]/).pop() : '');
   const [name, setName] = useState(editingSound?.name || '');
-  const [color, setColor] = useState(editingSound?.color || PRESET_COLORS[0]);
+  const [color, setColor] = useState(editingSound?.color || PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
   const [volume, setVolume] = useState(editingSound?.volume ?? 0.8);
   const [shortcut, setShortcut] = useState(editingSound?.shortcut || '');
   const [categoryId, setCategoryId] = useState(editingSound?.categoryId || 'default');
@@ -139,7 +139,9 @@ export default function AddSoundModal() {
       // Electron: native dosya diyalogu
       const result = await window.electronAPI.openFileDialog();
       if (!result.canceled && result.filePaths.length > 0) {
-        const fp = result.filePaths[0];
+        const src = result.filePaths[0];
+        const copyResult = await window.electronAPI.copyFile(src);
+        const fp = copyResult.success ? copyResult.destPath : src;
         setFilePath(fp);
         const fn = fp.split(/[\\/]/).pop();
         setFileName(fn);
@@ -161,6 +163,28 @@ export default function AddSoundModal() {
       };
       input.click();
     }
+  };
+
+  const handleFolderSelect = async () => {
+    if (!window.electronAPI) return;
+    const result = await window.electronAPI.openFolderDialog();
+    if (result.canceled || !result.filePaths.length) return;
+    const files = await window.electronAPI.listAudioFiles(result.filePaths[0]);
+    if (!files.length) return;
+    const { addSound, closeAddModal } = useSoundStore.getState();
+    for (const src of files) {
+      const copyResult = await window.electronAPI.copyFile(src);
+      const fp = copyResult.success ? copyResult.destPath : src;
+      const fn = fp.split(/[\\/]/).pop();
+      addSound({
+        name: fn.replace(/\.[^.]+$/, ''),
+        filePath: fp,
+        color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)],
+        volume: 0.8,
+        categoryId: categoryId,
+      });
+    }
+    closeAddModal();
   };
 
   const handleSubmit = (e) => {
@@ -229,9 +253,10 @@ export default function AddSoundModal() {
                 {/* File picker */}
                 <div>
                   <label className={labelCls} style={{ color: '#8e9c8b' }}>Ses Dosyası</label>
+                  <div className="flex gap-2">
                   <button
                     type="button" onClick={handleFileSelect}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] transition-all text-left"
+                    className="flex-1 flex items-center gap-3 px-3 py-2.5 bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] transition-all text-left"
                   >
                     <div className="w-8 h-8 flex items-center justify-center shrink-0" style={{ background: 'rgba(196,255,0,0.1)' }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="#c4ff00">
@@ -249,6 +274,18 @@ export default function AddSoundModal() {
                       <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
                   </button>
+                  {window.electronAPI && (
+                    <button
+                      type="button" onClick={handleFolderSelect}
+                      title="Klasörden toplu ekle"
+                      className="px-3 py-2.5 bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] text-[#5c665a] hover:text-[#c4ff00] transition-colors shrink-0"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                      </svg>
+                    </button>
+                  )}
+                  </div>
                   {filePath && (
                     <div className="mt-2 p-2 bg-app-bg border border-app-border">
                       <WaveformDisplay filePath={filePath} color={color} height={48} bars={80}/>

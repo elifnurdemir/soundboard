@@ -14,7 +14,14 @@ export default function VoiceChatPanel() {
 
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { loadDevices(); }, []);
+  useEffect(() => {
+    loadDevices();
+    // Restore saved device into store state
+    const savedId = useSoundStore.getState().settings.voiceDeviceId;
+    if (savedId && !virtualDeviceId) {
+      setVirtualDevice(savedId);
+    }
+  }, []);
 
   useEffect(() => {
     const h = (e) => { if (e.key === 'Escape') closeVoiceChat(); };

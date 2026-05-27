@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   globalVolume: 1,
   theme: 'dark',
   gridColumns: 5,
+  voiceDeviceId: null,
 };
 
 const DEFAULT_CATEGORIES = [
@@ -97,6 +98,11 @@ const useSoundStore = create((set, get) => ({
       console.error('Load error:', err);
     } finally {
       set({ isLoaded: true });
+      // Restore virtual device on router
+      const { settings } = get();
+      if (settings.voiceDeviceId) {
+        voiceChatRouter.setVirtualDevice(settings.voiceDeviceId);
+      }
     }
   },
 
@@ -197,6 +203,10 @@ const useSoundStore = create((set, get) => ({
   playSound: async (sound) => {
     const { settings, playingSounds, cooldownTracker } = get();
     const now = Date.now();
+
+    // Block if any sound is currently playing
+    const anyPlaying = Object.values(playingSounds).some((instances) => instances.length > 0);
+    if (anyPlaying) return;
 
     // Cooldown check
     if (sound.cooldown > 0) {
