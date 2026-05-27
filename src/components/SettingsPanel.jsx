@@ -96,11 +96,13 @@ export default function SettingsPanel() {
     useSoundStore();
   const [dataPath, setDataPath] = useState("");
   const [soundsFolder, setSoundsFolder] = useState("");
+  const [appVersion, setAppVersion] = useState("");
 
   useEffect(() => {
     if (window.electronAPI) {
       window.electronAPI.getDataPath().then(setDataPath);
       window.electronAPI.getSoundsFolder().then(setSoundsFolder);
+      window.electronAPI.getAppVersion().then(setAppVersion);
     } else {
       setDataPath("localStorage (tarayıcı modu)");
     }
@@ -365,7 +367,7 @@ export default function SettingsPanel() {
                 SOUNDBOARD
               </p>
               <p className="text-[10px] font-mono text-[#5c665a]">
-                v2.0.0 · ELECTRON + REACT
+                {appVersion ? `v${appVersion}` : 'v—'} · ELECTRON + REACT
               </p>
               <p className="text-[10px] font-mono text-[#3c4238]">
                 VB-AUDIO · OBS · TWITCH

@@ -403,6 +403,8 @@ ipcMain.handle('install-update', () => {
 });
 
 // ─── Window Controls ──────────────────────────────────────────────────────────
+ipcMain.handle('get-app-version', () => app.getVersion());
+
 ipcMain.handle('window:minimize', () => mainWindow?.minimize());
 ipcMain.handle('window:maximize', () => {
   if (mainWindow?.isMaximized()) mainWindow.unmaximize();
