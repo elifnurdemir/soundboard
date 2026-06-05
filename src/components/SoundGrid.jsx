@@ -12,6 +12,7 @@ import {
 } from '@dnd-kit/sortable';
 import useSoundStore from '../store/useSoundStore';
 import SoundButton from './SoundButton';
+import KeyboardView from './KeyboardView';
 
 function EmptyState({ onAdd, isFiltered }) {
   return (
@@ -46,10 +47,48 @@ function EmptyState({ onAdd, isFiltered }) {
   );
 }
 
+function ViewToggle() {
+  const { settings, updateSettings } = useSoundStore();
+  const mode = settings.viewMode || 'grid';
+  return (
+    <div className="flex justify-end mb-3">
+      <div className="flex overflow-hidden border border-app-border">
+        {[
+          { id: 'grid', icon: (
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <rect x="0" y="0" width="6" height="6"/><rect x="10" y="0" width="6" height="6"/>
+              <rect x="0" y="10" width="6" height="6"/><rect x="10" y="10" width="6" height="6"/>
+            </svg>
+          )},
+          { id: 'keyboard', icon: (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="6" width="20" height="12" rx="2"/>
+              <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/>
+            </svg>
+          )},
+        ].map(({ id, icon }) => (
+          <button
+            key={id}
+            onClick={() => updateSettings({ viewMode: id })}
+            className="w-8 h-7 flex items-center justify-center transition-colors"
+            style={mode === id
+              ? { background: 'var(--accent)', color: '#0b0d0b' }
+              : { background: '#141714', color: '#5c665a' }
+            }
+          >
+            {icon}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function SoundGrid() {
   const { categories, activeCategory, searchQuery, settings, openAddModal, reorderSounds, getFilteredSounds } = useSoundStore();
   const filteredSounds = getFilteredSounds();
   const isFiltered = !!(searchQuery.trim()) || activeCategory !== 'all';
+  const viewMode = settings.viewMode || 'grid';
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -63,8 +102,22 @@ export default function SoundGrid() {
 
   const cols = settings.gridColumns || 5;
 
+  if (viewMode === 'keyboard') {
+    return (
+      <>
+        <ViewToggle />
+        <KeyboardView />
+      </>
+    );
+  }
+
   if (filteredSounds.length === 0) {
-    return <EmptyState onAdd={() => openAddModal()} isFiltered={isFiltered} />;
+    return (
+      <>
+        <ViewToggle />
+        <EmptyState onAdd={() => openAddModal()} isFiltered={isFiltered} />
+      </>
+    );
   }
 
   const renderGrid = (sounds) => (
@@ -87,33 +140,41 @@ export default function SoundGrid() {
     const orphans = filteredSounds.filter((s) => !knownIds.has(s.categoryId));
 
     return (
-      <div className="space-y-7">
-        {grouped.map(({ category, sounds }) => (
-          <section key={category.id}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-2 h-2 shrink-0" style={{ backgroundColor: category.color }}/>
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.12em] font-mono" style={{ color: '#8e9c8b' }}>
-                {category.name}
-              </h2>
-              <div className="flex-1 h-px" style={{ background: '#1e231e' }}/>
-              <span className="text-[10px] font-mono" style={{ color: '#3c4238' }}>{sounds.length}</span>
-            </div>
-            {renderGrid(sounds)}
-          </section>
-        ))}
-        {orphans.length > 0 && (
-          <section>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-2 h-2 bg-[#3c4238] shrink-0"/>
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.12em] font-mono text-[#5c665a]">DİĞER</h2>
-              <div className="flex-1 h-px" style={{ background: '#1e231e' }}/>
-            </div>
-            {renderGrid(orphans)}
-          </section>
-        )}
-      </div>
+      <>
+        <ViewToggle />
+        <div className="space-y-7">
+          {grouped.map(({ category, sounds }) => (
+            <section key={category.id}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-2 h-2 shrink-0" style={{ backgroundColor: category.color }}/>
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.12em] font-mono" style={{ color: '#8e9c8b' }}>
+                  {category.name}
+                </h2>
+                <div className="flex-1 h-px" style={{ background: '#1e231e' }}/>
+                <span className="text-[10px] font-mono" style={{ color: '#3c4238' }}>{sounds.length}</span>
+              </div>
+              {renderGrid(sounds)}
+            </section>
+          ))}
+          {orphans.length > 0 && (
+            <section>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-2 h-2 bg-[#3c4238] shrink-0"/>
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.12em] font-mono text-[#5c665a]">DİĞER</h2>
+                <div className="flex-1 h-px" style={{ background: '#1e231e' }}/>
+              </div>
+              {renderGrid(orphans)}
+            </section>
+          )}
+        </div>
+      </>
     );
   }
 
-  return renderGrid(filteredSounds);
+  return (
+    <>
+      <ViewToggle />
+      {renderGrid(filteredSounds)}
+    </>
+  );
 }

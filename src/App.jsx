@@ -9,6 +9,7 @@ import SettingsPanel from './components/SettingsPanel';
 import VoiceChatPanel from './components/VoiceChatPanel';
 import StreamPanel from './components/StreamPanel';
 import UpdateBanner from './components/UpdateBanner';
+import SoundQueue from './components/SoundQueue';
 
 function matchesShortcut(event, shortcut) {
   if (!shortcut) return false;
@@ -113,6 +114,7 @@ export default function App() {
       {isVoiceChatOpen && <VoiceChatPanel />}
       {isStreamOpen && <StreamPanel />}
       <UpdateBanner />
+      <SoundQueue />
     </div>
   );
 }

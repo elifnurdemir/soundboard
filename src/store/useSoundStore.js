@@ -50,6 +50,9 @@ const DEFAULT_SETTINGS = {
   theme: 'dark',
   gridColumns: 5,
   voiceDeviceId: null,
+  viewMode: 'grid',        // 'grid' | 'keyboard'
+  keyboardLayout: '75',
+  keyboardZoom: 1,
 };
 
 const DEFAULT_CATEGORIES = [
@@ -99,6 +102,8 @@ const useSoundStore = create((set, get) => ({
   playingSounds: {},
   // cooldown tracking { [soundId]: lastPlayedTimestamp }
   cooldownTracker: {},
+  // playback queue — sounds waiting to play
+  soundQueue: [],
   isSettingsOpen: false,
   isAddModalOpen: false,
   isVoiceChatOpen: false,
@@ -241,9 +246,12 @@ const useSoundStore = create((set, get) => ({
     const { settings, playingSounds, cooldownTracker } = get();
     const now = Date.now();
 
-    // Block if any sound is currently playing
+    // If something is playing, add to queue instead of blocking
     const anyPlaying = Object.values(playingSounds).some((instances) => instances.length > 0);
-    if (anyPlaying) return;
+    if (anyPlaying) {
+      set((state) => ({ soundQueue: [...state.soundQueue, sound] }));
+      return;
+    }
 
     // Cooldown check
     if (sound.cooldown > 0) {
@@ -272,7 +280,7 @@ const useSoundStore = create((set, get) => ({
       audio.volume = targetVol;
     }
 
-    // Cleanup on end
+    // Cleanup on end — then play next from queue
     const cleanup = () => {
       set((state) => {
         const instances = (state.playingSounds[sound.id] || []).filter((inst) => inst.audio !== audio);
@@ -281,6 +289,7 @@ const useSoundStore = create((set, get) => ({
         else next[sound.id] = instances;
         return { playingSounds: next };
       });
+      get()._playNextFromQueue();
     };
 
     if (!sound.loop) {
@@ -381,8 +390,24 @@ const useSoundStore = create((set, get) => ({
       audio.pause(); audio.src = '';
       if (vcAudio) { vcAudio.pause(); vcAudio.src = ''; }
     });
-    set({ playingSounds: {} });
+    set({ playingSounds: {}, soundQueue: [] });
   },
+
+  _playNextFromQueue: () => {
+    const { soundQueue, playingSounds } = get();
+    if (soundQueue.length === 0) return;
+    const anyPlaying = Object.values(playingSounds).some((i) => i.length > 0);
+    if (anyPlaying) return;
+    const [next, ...rest] = soundQueue;
+    set({ soundQueue: rest });
+    get().playSound(next);
+  },
+
+  clearQueue: () => set({ soundQueue: [] }),
+
+  removeFromQueue: (index) => set((state) => ({
+    soundQueue: state.soundQueue.filter((_, i) => i !== index),
+  })),
 
   // Update live volume for all instances of a sound
   updatePlayingVolume: (soundId, volume) => {
