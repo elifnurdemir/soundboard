@@ -97,6 +97,8 @@ export default function SettingsPanel() {
   const [dataPath, setDataPath] = useState("");
   const [soundsFolder, setSoundsFolder] = useState("");
   const [appVersion, setAppVersion] = useState("");
+  const [exportState, setExportState] = useState('idle'); // idle | working | done | error
+  const [importState, setImportState] = useState('idle');
 
   useEffect(() => {
     if (window.electronAPI) {
@@ -116,51 +118,45 @@ export default function SettingsPanel() {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    if (!window.electronAPI) return;
+    setExportState('working');
     const state = useSoundStore.getState();
-    const data = {
+    const result = await window.electronAPI.exportZip({
       categories: state.categories,
       sounds: state.sounds,
       settings: state.settings,
-      exportedAt: new Date().toISOString(),
-      version: "2.0",
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `soundboard-backup-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (result.canceled) { setExportState('idle'); return; }
+    setExportState(result.success ? 'done' : 'error');
+    setTimeout(() => setExportState('idle'), 2500);
   };
 
-  const handleImport = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        if (data.sounds && data.categories) {
-          useSoundStore.setState({
-            sounds: data.sounds,
-            categories: data.categories,
-            settings: { ...settings, ...(data.settings || {}) },
-          });
-          useSoundStore.getState().saveData();
-        } else {
-          alert("Geçersiz yedek dosyası.");
-        }
-      } catch (err) {
-        alert("Dosya okunamadı: " + err.message);
-      }
-    };
-    input.click();
+  const handleImport = async () => {
+    if (!window.electronAPI) return;
+    setImportState('working');
+    const result = await window.electronAPI.importZip();
+    if (result.canceled) { setImportState('idle'); return; }
+    if (!result.success) {
+      setImportState('error');
+      setTimeout(() => setImportState('idle'), 2500);
+      return;
+    }
+    const { data } = result;
+    const state = useSoundStore.getState();
+    // Merge: add imported categories that don't exist yet
+    const existingCatIds = new Set(state.categories.map(c => c.id));
+    const newCats = data.categories.filter(c => !existingCatIds.has(c.id));
+    // Merge sounds
+    const existingSoundIds = new Set(state.sounds.map(s => s.id));
+    const newSounds = data.sounds.filter(s => !existingSoundIds.has(s.id));
+    useSoundStore.setState({
+      categories: [...state.categories, ...newCats],
+      sounds: [...state.sounds, ...newSounds],
+    });
+    useSoundStore.getState().saveData();
+    setImportState('done');
+    setTimeout(() => setImportState('idle'), 2500);
   };
 
   return (
@@ -304,43 +300,45 @@ export default function SettingsPanel() {
             <div className="flex gap-2">
               <button
                 onClick={handleExport}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-app-surface border border-app-border hover:border-[rgba(196,255,0,0.3)] text-[#8e9c8b] hover:text-[#c4ff00] text-xs font-bold font-mono tracking-wider transition-colors"
+                disabled={exportState === 'working'}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 border text-xs font-bold font-mono tracking-wider transition-colors disabled:opacity-50"
+                style={exportState === 'done'
+                  ? { background: 'rgba(196,255,0,0.1)', borderColor: 'rgba(196,255,0,0.4)', color: 'var(--accent)' }
+                  : exportState === 'error'
+                  ? { background: 'rgba(220,38,38,0.1)', borderColor: 'rgba(220,38,38,0.4)', color: '#f87171' }
+                  : { background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: '#8e9c8b' }
+                }
               >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                EXPORT
+                {exportState === 'working' ? '...' : exportState === 'done' ? '✓ KAYDEDİLDİ' : exportState === 'error' ? '✗ HATA' : (
+                  <>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    EXPORT
+                  </>
+                )}
               </button>
               <button
                 onClick={handleImport}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-app-surface border border-app-border hover:border-[rgba(196,255,0,0.3)] text-[#8e9c8b] hover:text-[#c4ff00] text-xs font-bold font-mono tracking-wider transition-colors"
+                disabled={importState === 'working'}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 border text-xs font-bold font-mono tracking-wider transition-colors disabled:opacity-50"
+                style={importState === 'done'
+                  ? { background: 'rgba(196,255,0,0.1)', borderColor: 'rgba(196,255,0,0.4)', color: 'var(--accent)' }
+                  : importState === 'error'
+                  ? { background: 'rgba(220,38,38,0.1)', borderColor: 'rgba(220,38,38,0.4)', color: '#f87171' }
+                  : { background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: '#8e9c8b' }
+                }
               >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                IMPORT
+                {importState === 'working' ? '...' : importState === 'done' ? '✓ İÇE AKTARILDI' : importState === 'error' ? '✗ HATA' : (
+                  <>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    IMPORT
+                  </>
+                )}
               </button>
             </div>
           </Section>

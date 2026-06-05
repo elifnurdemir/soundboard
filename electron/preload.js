@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', () => cb()),
 
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  exportZip: (data) => ipcRenderer.invoke('export-zip', data),
+  importZip: () => ipcRenderer.invoke('import-zip'),
 
   // Window controls
   minimize: () => ipcRenderer.invoke('window:minimize'),

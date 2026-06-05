@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, protocol, Tray, Menu, nativeImage, shell } = require('electron');
 const { uIOhook, UiohookKey } = require('uiohook-napi');
 const { autoUpdater } = require('electron-updater');
+const AdmZip = require('adm-zip');
 const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
@@ -411,6 +412,107 @@ ipcMain.handle('install-update', () => {
 
 // ─── Window Controls ──────────────────────────────────────────────────────────
 ipcMain.handle('get-app-version', () => app.getVersion());
+
+// ─── Export / Import ──────────────────────────────────────────────────────────
+ipcMain.handle('export-zip', async (_, { categories, sounds, settings }) => {
+  if (!mainWindow) return { success: false };
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    title: 'Soundboard Dışa Aktar',
+    defaultPath: `soundboard-export-${Date.now()}.zip`,
+    filters: [{ name: 'ZIP', extensions: ['zip'] }],
+  });
+  if (canceled || !filePath) return { success: false, canceled: true };
+
+  try {
+    const zip = new AdmZip();
+    const manifest = { version: 1, categories, sounds: [] };
+
+    for (const sound of sounds) {
+      const entry = { ...sound };
+
+      // Add audio file
+      if (sound.filePath && fs.existsSync(sound.filePath)) {
+        const ext = path.extname(sound.filePath);
+        const zipName = `sounds/${sound.id}${ext}`;
+        zip.addLocalFile(sound.filePath, 'sounds', `${sound.id}${ext}`);
+        entry.filePath = zipName;
+      }
+
+      // Add image file
+      if (sound.image && fs.existsSync(sound.image)) {
+        const ext = path.extname(sound.image);
+        const zipName = `images/${sound.id}${ext}`;
+        zip.addLocalFile(sound.image, 'images', `${sound.id}${ext}`);
+        entry.image = zipName;
+      }
+
+      manifest.sounds.push(entry);
+    }
+
+    zip.addFile('manifest.json', Buffer.from(JSON.stringify(manifest, null, 2), 'utf-8'));
+    zip.writeZip(filePath);
+    return { success: true, filePath };
+  } catch (err) {
+    console.error('Export error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('import-zip', async () => {
+  if (!mainWindow) return { success: false };
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Soundboard İçe Aktar',
+    filters: [{ name: 'ZIP', extensions: ['zip'] }],
+    properties: ['openFile'],
+  });
+  if (canceled || !filePaths.length) return { success: false, canceled: true };
+
+  try {
+    const zip = new AdmZip(filePaths[0]);
+    const manifestEntry = zip.getEntry('manifest.json');
+    if (!manifestEntry) return { success: false, error: 'Geçersiz dosya: manifest.json bulunamadı' };
+
+    const manifest = JSON.parse(manifestEntry.getData().toString('utf-8'));
+    if (!manifest.sounds || !manifest.categories) return { success: false, error: 'Geçersiz manifest' };
+
+    const soundsDir = path.join(app.getPath('userData'), 'sounds');
+    const imagesDir = path.join(app.getPath('userData'), 'images');
+    fs.mkdirSync(soundsDir, { recursive: true });
+    fs.mkdirSync(imagesDir, { recursive: true });
+
+    const updatedSounds = manifest.sounds.map((sound) => {
+      const entry = { ...sound };
+
+      if (sound.filePath && sound.filePath.startsWith('sounds/')) {
+        const zipEntry = zip.getEntry(sound.filePath);
+        if (zipEntry) {
+          const destPath = path.join(soundsDir, path.basename(sound.filePath));
+          zip.extractEntryTo(zipEntry, soundsDir, false, true);
+          entry.filePath = destPath;
+        }
+      }
+
+      if (sound.image && sound.image.startsWith('images/')) {
+        const zipEntry = zip.getEntry(sound.image);
+        if (zipEntry) {
+          const destPath = path.join(imagesDir, path.basename(sound.image));
+          zip.extractEntryTo(zipEntry, imagesDir, false, true);
+          entry.image = destPath;
+        }
+      }
+
+      return entry;
+    });
+
+    return {
+      success: true,
+      data: { categories: manifest.categories, sounds: updatedSounds },
+    };
+  } catch (err) {
+    console.error('Import error:', err);
+    return { success: false, error: err.message };
+  }
+});
 
 ipcMain.handle('window:minimize', () => mainWindow?.minimize());
 ipcMain.handle('window:maximize', () => {

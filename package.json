@@ -1,6 +1,6 @@
 {
   "name": "soundboard",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Soundboard Desktop Application",
   "main": "electron/main.js",
   "scripts": {
@@ -57,6 +57,7 @@
     }
   },
   "dependencies": {
+    "adm-zip": "^0.5.17",
     "electron-updater": "^6.8.3",
     "uiohook-napi": "^1.5.5"
   },
