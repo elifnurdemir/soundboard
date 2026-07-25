@@ -409,6 +409,144 @@ ipcMain.handle('install-virtual-cable', async () => {
   });
 });
 
+// ─── Per-app audio output routing (svcl / NirSoft) ───────────────────────────
+// Bundled per NirSoft's freeware terms (nirsoft.net) — whole zip kept intact under electron/bin/svcl.
+// Known voice/call apps are excluded everywhere below: routing them into CABLE Input (which is
+// also used as Discord's mic input) would echo the other person's own voice back to them.
+const VOICE_APP_BLOCKLIST = new Set(['discord.exe', 'teams.exe', 'zoom.exe', 'skype.exe', 'slack.exe']);
+const SYSTEM_NOISE_EXE = new Set(['svchost.exe', 'dwm.exe', 'explorer.exe', 'soundboard.exe']);
+
+function getSvclPath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'bin', 'svcl', 'svcl.exe')
+    : path.join(__dirname, 'bin', 'svcl', 'svcl.exe');
+}
+
+// Minimal CSV parser — svcl's /scomma output quotes fields containing commas (e.g. per-channel dB lists).
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+      else field += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\r') { /* skip */ }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else field += c;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function csvRowsToObjects(rows) {
+  if (!rows.length) return [];
+  const header = rows[0];
+  return rows.slice(1).filter((r) => r.length > 1).map((r) => {
+    const obj = {};
+    header.forEach((h, i) => { obj[h.trim()] = r[i] ?? ''; });
+    return obj;
+  });
+}
+
+function exeNameFromRow(row) {
+  const p = row['Process Path'] || '';
+  return p ? path.basename(p) : '';
+}
+
+function runSvclExport() {
+  return new Promise((resolve, reject) => {
+    const svclPath = getSvclPath();
+    if (!fs.existsSync(svclPath)) {
+      reject(new Error('svcl bulunamadı. "npm install" çalıştırıldığından emin ol.'));
+      return;
+    }
+    const tmpCsv = path.join(app.getPath('temp'), `svcl-${Date.now()}.csv`);
+    const proc = spawn(svclPath, ['/scomma', tmpCsv]);
+    proc.on('error', reject);
+    proc.on('close', () => {
+      try {
+        const text = fs.readFileSync(tmpCsv, 'utf-8');
+        fs.unlinkSync(tmpCsv);
+        resolve(csvRowsToObjects(parseCsv(text)));
+      } catch (err) { reject(err); }
+    });
+  });
+}
+
+function runSvclSetAppDefault(deviceFriendlyId, exeName) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(getSvclPath(), ['/SetAppDefault', deviceFriendlyId, 'all', exeName]);
+    let stderr = '';
+    proc.stderr?.on('data', (d) => { stderr += d.toString(); });
+    proc.on('error', reject);
+    proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error(stderr.trim() || `svcl çıkış kodu ${code}`))));
+  });
+}
+
+function findCableInputDeviceId(rows) {
+  const row = rows.find((r) => r.Type === 'Device' && r.Direction === 'Render' && r.Name === 'CABLE Input');
+  return row ? row['Command-Line Friendly ID'] : null;
+}
+
+// The system's current default output device (the "Default" column is only non-empty on
+// that one Device/Render row). Windows keeps a stale Application/Render row per device an
+// app has EVER played through, so per-app rows can't reliably tell us which one is live —
+// the system default is what an unrouted app actually plays through, and what "geri al"
+// should restore.
+function findSystemDefaultRenderDeviceId(rows) {
+  const row = rows.find((r) => r.Type === 'Device' && r.Direction === 'Render' && r.Default === 'Render');
+  return row ? row['Command-Line Friendly ID'] : null;
+}
+
+ipcMain.handle('list-audio-sessions', async () => {
+  try {
+    const rows = await runSvclExport();
+    const seen = new Set();
+    const apps = [];
+    for (const row of rows) {
+      if (row.Type !== 'Application' || row.Direction !== 'Render') continue;
+      const exe = exeNameFromRow(row);
+      if (!exe) continue;
+      const exeLower = exe.toLowerCase();
+      if (VOICE_APP_BLOCKLIST.includes(exeLower) || SYSTEM_NOISE_EXE.includes(exeLower) || seen.has(exeLower)) continue;
+      seen.add(exeLower);
+      apps.push({ exe, name: row.Name || exe });
+    }
+    return { success: true, apps };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('route-app-to-cable', async (_, exeName) => {
+  if (VOICE_APP_BLOCKLIST.includes((exeName || '').toLowerCase())) {
+    return { success: false, error: 'Bu uygulama, sesin geri yankılanmasını önlemek için yönlendirilemez.' };
+  }
+  try {
+    const rows = await runSvclExport();
+    const cableId = findCableInputDeviceId(rows);
+    if (!cableId) return { success: false, error: 'CABLE Input bulunamadı. Önce VB-CABLE kurulu olmalı.' };
+    const previousDeviceId = findSystemDefaultRenderDeviceId(rows);
+    await runSvclSetAppDefault(cableId, exeName);
+    return { success: true, previousDeviceId };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('restore-app-device', async (_, exeName, deviceId) => {
+  if (!deviceId) return { success: false, error: 'Önceki cihaz bilgisi yok.' };
+  try {
+    await runSvclSetAppDefault(deviceId, exeName);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 ipcMain.handle('app-quit', () => {
   isQuitting = true;
   tray?.destroy();

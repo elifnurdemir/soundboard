@@ -12,7 +12,7 @@
     "dist": "vite build && electron-builder --win --x64",
     "dist:dir": "vite build && electron-builder --win --x64 --dir",
     "icon": "node scripts/generate-icon.js",
-    "postinstall": "node scripts/download-ytdlp.js && node scripts/download-vbcable.js",
+    "postinstall": "node scripts/download-ytdlp.js && node scripts/download-vbcable.js && node scripts/download-svcl.js",
     "clean-release": "node scripts/clean-release.js",
     "release": "npm version patch --no-git-tag-version && node scripts/clean-release.js && node scripts/generate-icon.js && vite build && electron-builder --win --x64 --publish always"
   },

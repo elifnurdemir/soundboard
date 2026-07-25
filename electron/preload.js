@@ -32,6 +32,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onYoutubeProgress: (cb) => ipcRenderer.on('youtube-download-progress', (_, pct) => cb(pct)),
   offYoutubeProgress: () => ipcRenderer.removeAllListeners('youtube-download-progress'),
   installVirtualCable: () => ipcRenderer.invoke('install-virtual-cable'),
+  listAudioSessions: () => ipcRenderer.invoke('list-audio-sessions'),
+  routeAppToCable: (exeName) => ipcRenderer.invoke('route-app-to-cable', exeName),
+  restoreAppDevice: (exeName, deviceId) => ipcRenderer.invoke('restore-app-device', exeName, deviceId),
   exportZip: (data) => ipcRenderer.invoke('export-zip', data),
   importZip: () => ipcRenderer.invoke('import-zip'),
 

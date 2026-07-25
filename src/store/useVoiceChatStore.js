@@ -8,6 +8,7 @@ const useVoiceChatStore = create((set, get) => ({
   micPassthrough: false,
   outputDevices: [],
   error: null,
+  routedApps: {}, // { [exeName]: previousDeviceId }
 
   loadDevices: async () => {
     try {
@@ -54,6 +55,31 @@ const useVoiceChatStore = create((set, get) => ({
     } catch (err) {
       set({ error: err.message, micPassthrough: false });
     }
+  },
+
+  routeApp: async (exeName) => {
+    const res = await window.electronAPI.routeAppToCable(exeName);
+    if (res.success) {
+      set((state) => ({ routedApps: { ...state.routedApps, [exeName]: res.previousDeviceId } }));
+    } else {
+      set({ error: res.error });
+    }
+    return res;
+  },
+
+  unrouteApp: async (exeName) => {
+    const deviceId = get().routedApps[exeName];
+    const res = await window.electronAPI.restoreAppDevice(exeName, deviceId);
+    if (res.success) {
+      set((state) => {
+        const next = { ...state.routedApps };
+        delete next[exeName];
+        return { routedApps: next };
+      });
+    } else {
+      set({ error: res.error });
+    }
+    return res;
   },
 
   setEnabled: (val) => {

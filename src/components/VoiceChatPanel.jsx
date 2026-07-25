@@ -10,12 +10,16 @@ export default function VoiceChatPanel() {
     virtualDeviceId, setVirtualDevice,
     micPassthrough, setMicPassthrough,
     outputDevices, loadDevices,
+    routedApps, routeApp, unrouteApp,
     error,
   } = useVoiceChatStore();
 
   const [loading, setLoading] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [installMessage, setInstallMessage] = useState('');
+  const [audioApps, setAudioApps] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [routingExe, setRoutingExe] = useState(null);
 
   useEffect(() => {
     loadDevices();
@@ -43,6 +47,26 @@ export default function VoiceChatPanel() {
 
   const virtualCables = outputDevices.filter((d) => VoiceChatRouter.isVirtualCableLabel(d.label));
   const otherDevices = outputDevices.filter((d) => !virtualCables.includes(d));
+
+  const handleScanApps = async () => {
+    setScanning(true);
+    try {
+      const res = await window.electronAPI.listAudioSessions();
+      setAudioApps(res.success ? res.apps : []);
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleToggleRoute = async (exe) => {
+    setRoutingExe(exe);
+    try {
+      if (routedApps[exe]) await unrouteApp(exe);
+      else await routeApp(exe);
+    } finally {
+      setRoutingExe(null);
+    }
+  };
 
   const handleInstallVirtualCable = async () => {
     setInstalling(true);
@@ -189,6 +213,60 @@ export default function VoiceChatPanel() {
               ↺ CİHAZLARI YENİLE
             </button>
           </div>
+
+          {/* Per-app output routing (Chrome/Spotify → CABLE) */}
+          {window.electronAPI && (
+            <div className="p-3 bg-app-surface border border-app-border space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-white">Uygulama Sesini Yönlendir</p>
+                <button
+                  onClick={handleScanApps}
+                  disabled={scanning}
+                  className="text-[10px] font-bold font-mono tracking-wider disabled:opacity-50 transition-colors hover:text-white"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  {scanning ? '...' : '🔍 BUL'}
+                </button>
+              </div>
+              <p className="text-xs font-mono" style={{ color: '#5c665a' }}>
+                Chrome (YouTube) veya Spotify gibi uygulamaların çıkışını doğrudan sanal kabloya yönlendirir.
+              </p>
+
+              {audioApps && (
+                audioApps.length === 0 ? (
+                  <p className="text-xs font-mono italic" style={{ color: '#5c665a' }}>Ses çalan bir uygulama bulunamadı.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {audioApps.map((a) => {
+                      const routed = !!routedApps[a.exe];
+                      const busy = routingExe === a.exe;
+                      const buttonLabel = busy ? '...' : (routed ? 'GERİ AL' : "CABLE'A YÖNLENDİR");
+                      return (
+                        <div key={a.exe} className="flex items-center justify-between gap-2 p-2 bg-app-input border border-app-border">
+                          <span className="text-xs font-mono text-white truncate">{a.name}</span>
+                          <button
+                            onClick={() => handleToggleRoute(a.exe)}
+                            disabled={busy}
+                            className="shrink-0 px-2 py-1 text-[10px] font-bold font-mono tracking-wider border disabled:opacity-50 transition-colors"
+                            style={routed
+                              ? { borderColor: 'rgba(220,38,38,0.4)', color: '#f87171', background: 'rgba(220,38,38,0.08)' }
+                              : { borderColor: 'var(--accent-border)', color: 'var(--accent)', background: 'var(--accent-dim)' }
+                            }
+                          >
+                            {buttonLabel}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+
+              <p className="text-[9px] font-mono pt-2 border-t border-app-border" style={{ color: '#3c4238' }}>
+                Discord/Teams/Zoom/Skype/Slack burada görünmez — sesin geri yankılanmasını önlemek için. Ses yönlendirme svcl (NirSoft.net) ile yapılır.
+              </p>
+            </div>
+          )}
 
           {/* Mic passthrough */}
           <div className="flex items-center justify-between p-3 bg-app-surface border border-app-border">
