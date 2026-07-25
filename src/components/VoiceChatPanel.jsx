@@ -265,6 +265,22 @@ export default function VoiceChatPanel() {
               <p className="text-[9px] font-mono pt-2 border-t border-app-border" style={{ color: '#3c4238' }}>
                 Discord/Teams/Zoom/Skype/Slack burada görünmez — sesin geri yankılanmasını önlemek için. Ses yönlendirme svcl (NirSoft.net) ile yapılır.
               </p>
+
+              <div className="pt-2 border-t border-app-border space-y-1.5">
+                <p className="text-[10px] font-mono" style={{ color: '#8e9c8b' }}>
+                  ⚠ Yönlendirilen uygulamanın sesini <strong className="text-white">kendi kulaklığından duymazsın</strong> — Windows bir uygulamanın çıkışını aynı anda sadece tek cihaza gönderebiliyor.
+                </p>
+                <p className="text-[10px] font-mono" style={{ color: '#5c665a' }}>
+                  Kendi başına da duymak istersen: <strong className="text-white">CABLE Output</strong> → Özellikler → <strong className="text-white">Dinle</strong> sekmesi → "Bu aygıtı dinle" işaretle → çalma cihazı olarak kendi kulaklığını seç.
+                </p>
+                <button
+                  onClick={() => window.electronAPI.openSoundRecordingPanel()}
+                  className="w-full py-1.5 text-[10px] font-bold font-mono tracking-wider bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] transition-colors"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  SES KAYIT AYARLARINI AÇ
+                </button>
+              </div>
             </div>
           )}
 

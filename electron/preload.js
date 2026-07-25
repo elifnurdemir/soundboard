@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listAudioSessions: () => ipcRenderer.invoke('list-audio-sessions'),
   routeAppToCable: (exeName) => ipcRenderer.invoke('route-app-to-cable', exeName),
   restoreAppDevice: (exeName, deviceId) => ipcRenderer.invoke('restore-app-device', exeName, deviceId),
+  openSoundRecordingPanel: () => ipcRenderer.invoke('open-sound-recording-panel'),
   exportZip: (data) => ipcRenderer.invoke('export-zip', data),
   importZip: () => ipcRenderer.invoke('import-zip'),
 
