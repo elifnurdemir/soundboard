@@ -318,6 +318,17 @@ ipcMain.handle('open-sounds-folder', () => {
   shell.openPath(folder);
 });
 
+ipcMain.handle('save-recording', async (_, arrayBuffer, ext) => {
+  try {
+    const folder = getSoundsFolder();
+    const destPath = path.join(folder, `kayit-${Date.now()}.${ext}`);
+    fs.writeFileSync(destPath, Buffer.from(arrayBuffer));
+    return { success: true, destPath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 // ─── YouTube Audio Download ───────────────────────────────────────────────────
 const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)/i;
 
@@ -545,6 +556,26 @@ ipcMain.handle('restore-app-device', async (_, exeName, deviceId) => {
   } catch (err) {
     return { success: false, error: err.message };
   }
+});
+
+// Renderer keeps main in sync with which apps are currently routed to CABLE, so we can
+// restore them even if the window/renderer isn't around to run cleanup JS at quit time.
+let routedAppsSnapshot = {};
+ipcMain.handle('sync-routed-apps', (_, snapshot) => { routedAppsSnapshot = snapshot || {}; });
+
+let restoringRoutedAppsOnQuit = false;
+app.on('before-quit', (e) => {
+  const entries = Object.entries(routedAppsSnapshot).filter(([, deviceId]) => deviceId);
+  if (!entries.length || restoringRoutedAppsOnQuit) return;
+  e.preventDefault();
+  restoringRoutedAppsOnQuit = true;
+  (async () => {
+    for (const [exeName, deviceId] of entries) {
+      try { await runSvclSetAppDefault(deviceId, exeName); } catch (_) { /* best-effort */ }
+    }
+    routedAppsSnapshot = {};
+    app.quit();
+  })();
 });
 
 // Opens Windows' Sound control panel directly on the Recording tab, so the user can

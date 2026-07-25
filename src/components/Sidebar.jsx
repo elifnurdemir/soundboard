@@ -92,6 +92,8 @@ export default function Sidebar() {
   };
 
   const allCount = sounds.length;
+  const favoriteCount = sounds.filter((s) => s.favorite).length;
+  const topCount = sounds.filter((s) => (s.playCount || 0) > 0).length;
 
   return (
     <aside className="w-52 shrink-0 border-r border-app-border flex flex-col overflow-hidden" style={{ background: '#0d0f0d' }}>
@@ -118,6 +120,40 @@ export default function Sidebar() {
           <span className="text-sm flex-1 font-mono">Tüm Sesler</span>
           <span className={`text-[10px] px-1.5 py-0.5 font-mono ${activeCategory === 'all' ? 'text-[#c4ff00]/70 bg-[rgba(196,255,0,0.12)]' : 'bg-app-raised text-[#5c665a]'}`}>
             {allCount}
+          </span>
+        </div>
+
+        {/* Favorites */}
+        <div
+          className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-all mx-1 ${
+            activeCategory === 'favorites'
+              ? 'bg-[rgba(196,255,0,0.08)] border-l-2'
+              : 'text-[#8e9c8b] hover:bg-app-surface hover:text-[#d0d8ce]'
+          }`}
+          style={activeCategory === 'favorites' ? { borderLeftColor: 'var(--accent)', color: 'var(--accent)' } : {}}
+          onClick={() => setActiveCategory('favorites')}
+        >
+          <span className="w-2 h-2 shrink-0 flex items-center justify-center text-xs leading-none">⭐</span>
+          <span className="text-sm flex-1 font-mono">Favoriler</span>
+          <span className={`text-[10px] px-1.5 py-0.5 font-mono ${activeCategory === 'favorites' ? 'text-[#c4ff00]/70 bg-[rgba(196,255,0,0.12)]' : 'bg-app-raised text-[#5c665a]'}`}>
+            {favoriteCount}
+          </span>
+        </div>
+
+        {/* Top played */}
+        <div
+          className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-all mx-1 ${
+            activeCategory === 'top'
+              ? 'bg-[rgba(196,255,0,0.08)] border-l-2'
+              : 'text-[#8e9c8b] hover:bg-app-surface hover:text-[#d0d8ce]'
+          }`}
+          style={activeCategory === 'top' ? { borderLeftColor: 'var(--accent)', color: 'var(--accent)' } : {}}
+          onClick={() => setActiveCategory('top')}
+        >
+          <span className="w-2 h-2 shrink-0 flex items-center justify-center text-xs leading-none">🔥</span>
+          <span className="text-sm flex-1 font-mono">En Çok Çalınanlar</span>
+          <span className={`text-[10px] px-1.5 py-0.5 font-mono ${activeCategory === 'top' ? 'text-[#c4ff00]/70 bg-[rgba(196,255,0,0.12)]' : 'bg-app-raised text-[#5c665a]'}`}>
+            {topCount}
           </span>
         </div>
 

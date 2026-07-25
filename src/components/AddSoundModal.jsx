@@ -140,6 +140,13 @@ export default function AddSoundModal() {
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadError, setDownloadError] = useState('');
+  const [recording, setRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [recordError, setRecordError] = useState('');
+  const mediaRecorderRef = useRef(null);
+  const recordChunksRef = useRef([]);
+  const recordStreamRef = useRef(null);
+  const recordTimerRef = useRef(null);
 
   const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)/i;
 
@@ -171,6 +178,65 @@ export default function AddSoundModal() {
       setDownloading(false);
     }
   };
+
+  const startRecording = async () => {
+    setRecordError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordStreamRef.current = stream;
+      recordChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordChunksRef.current.push(e.data); };
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        clearInterval(recordTimerRef.current);
+
+        const mimeType = mediaRecorder.mimeType || 'audio/webm';
+        const ext = mimeType.includes('ogg') ? 'ogg' : 'webm';
+        const blob = new Blob(recordChunksRef.current, { type: mimeType });
+
+        if (window.electronAPI) {
+          const buf = await blob.arrayBuffer();
+          const res = await window.electronAPI.saveRecording(buf, ext);
+          if (res.success) {
+            setFilePath(res.destPath);
+            setFileName(res.destPath.split(/[\\/]/).pop());
+            if (!name) setName(`Kayıt ${new Date().toLocaleTimeString('tr-TR')}`);
+            setTrimStart(0);
+            setTrimEnd(null);
+          } else {
+            setRecordError(res.error || 'Kayıt kaydedilemedi');
+          }
+        } else {
+          const blobUrl = URL.createObjectURL(blob);
+          setFilePath(blobUrl);
+          setFileName(`kayit.${ext}`);
+          if (!name) setName(`Kayıt ${new Date().toLocaleTimeString('tr-TR')}`);
+          setTrimStart(0);
+          setTrimEnd(null);
+        }
+      };
+
+      mediaRecorder.start();
+      setRecording(true);
+      setRecordSeconds(0);
+      recordTimerRef.current = setInterval(() => setRecordSeconds((s) => s + 1), 1000);
+    } catch (err) {
+      setRecordError('Mikrofona erişilemedi: ' + err.message);
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  };
+
+  useEffect(() => () => {
+    clearInterval(recordTimerRef.current);
+    recordStreamRef.current?.getTracks().forEach((t) => t.stop());
+  }, []);
 
   const handleFileSelect = async () => {
     if (window.electronAPI) {
@@ -362,6 +428,28 @@ export default function AddSoundModal() {
                       )}
                     </div>
                   )}
+
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={recording ? stopRecording : startRecording}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 border text-xs font-bold font-mono tracking-wider transition-colors"
+                      style={recording
+                        ? { background: 'rgba(220,38,38,0.1)', borderColor: 'rgba(220,38,38,0.4)', color: '#f87171' }
+                        : { background: 'var(--app-input)', borderColor: 'var(--app-border)', color: '#8e9c8b' }
+                      }
+                    >
+                      {recording ? (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                          DURDUR — {String(Math.floor(recordSeconds / 60)).padStart(2, '0')}:{String(recordSeconds % 60).padStart(2, '0')}
+                        </>
+                      ) : '🎙 MİKROFONDAN KAYDET'}
+                    </button>
+                    {recordError && (
+                      <p className="text-[10px] font-mono mt-1 text-red-400">{recordError}</p>
+                    )}
+                  </div>
 
                   {filePath && (
                     <div className="mt-2 p-2 bg-app-bg border border-app-border">

@@ -37,7 +37,7 @@ export default function SoundButton({ sound }) {
   const {
     playSound, stopSoundWithFade, playingSounds,
     updateSound, openAddModal, deleteSound, getCooldownProgress,
-    settings,
+    toggleFavorite, settings,
   } = useSoundStore();
 
   const displayColor = adaptColorForTheme(sound.color, settings.theme);
@@ -185,6 +185,9 @@ export default function SoundButton({ sound }) {
           {sound.loop && (
             <span className={`text-[9px] px-1 py-0.5 bg-black/30 ${textColor}`}>↺</span>
           )}
+          {sound.favorite && (
+            <span className="text-[9px] px-1 py-0.5 bg-black/30">⭐</span>
+          )}
           {sound.overlap && instanceCount > 1 && (
             <span className={`text-[9px] px-1.5 py-0.5 bg-black/30 ${textColor} font-bold font-mono`}>×{instanceCount}</span>
           )}
@@ -222,6 +225,15 @@ export default function SoundButton({ sound }) {
       {/* Edit/Delete */}
       {showControls && (
         <div className="no-play absolute top-1.5 right-1.5 flex gap-1 z-30">
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleFavorite(sound.id); }}
+            className={`w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-black/85 backdrop-blur-sm transition-colors ${sound.favorite ? 'text-yellow-400' : 'text-white/80 hover:text-white'}`}
+            title={sound.favorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill={sound.favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); openAddModal(sound); }}
             className="w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-black/85 backdrop-blur-sm text-white/80 hover:text-white transition-colors"

@@ -61,6 +61,7 @@ const useVoiceChatStore = create((set, get) => ({
     const res = await window.electronAPI.routeAppToCable(exeName);
     if (res.success) {
       set((state) => ({ routedApps: { ...state.routedApps, [exeName]: res.previousDeviceId } }));
+      window.electronAPI.syncRoutedApps(get().routedApps);
     } else {
       set({ error: res.error });
     }
@@ -76,6 +77,7 @@ const useVoiceChatStore = create((set, get) => ({
         delete next[exeName];
         return { routedApps: next };
       });
+      window.electronAPI.syncRoutedApps(get().routedApps);
     } else {
       set({ error: res.error });
     }

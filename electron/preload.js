@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // File system
   openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
   copyFile: (srcPath) => ipcRenderer.invoke('copy-sound-file', srcPath),
+  saveRecording: (arrayBuffer, ext) => ipcRenderer.invoke('save-recording', arrayBuffer, ext),
   getSoundsFolder: () => ipcRenderer.invoke('get-sounds-folder'),
   openSoundsFolder: () => ipcRenderer.invoke('open-sounds-folder'),
   openImageDialog: () => ipcRenderer.invoke('open-image-dialog'),
@@ -36,6 +37,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   routeAppToCable: (exeName) => ipcRenderer.invoke('route-app-to-cable', exeName),
   restoreAppDevice: (exeName, deviceId) => ipcRenderer.invoke('restore-app-device', exeName, deviceId),
   openSoundRecordingPanel: () => ipcRenderer.invoke('open-sound-recording-panel'),
+  syncRoutedApps: (snapshot) => ipcRenderer.invoke('sync-routed-apps', snapshot),
   exportZip: (data) => ipcRenderer.invoke('export-zip', data),
   importZip: () => ipcRenderer.invoke('import-zip'),
 

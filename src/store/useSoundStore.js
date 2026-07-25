@@ -180,6 +180,8 @@ const useSoundStore = create((set, get) => ({
       fadeOut: data.fadeOut ?? 0,
       trimStart: data.trimStart ?? 0,
       trimEnd: data.trimEnd ?? null,
+      favorite: data.favorite ?? false,
+      playCount: data.playCount ?? 0,
       cooldown: data.cooldown ?? 0,
       overlap: data.overlap ?? true,
       chatCommand: data.chatCommand || '',
@@ -200,6 +202,13 @@ const useSoundStore = create((set, get) => ({
   deleteSound: (id) => {
     get().stopAllInstancesOf(id);
     set((state) => ({ sounds: state.sounds.filter((s) => s.id !== id) }));
+    get().saveData();
+  },
+
+  toggleFavorite: (id) => {
+    set((state) => ({
+      sounds: state.sounds.map((s) => (s.id === id ? { ...s, favorite: !s.favorite } : s)),
+    }));
     get().saveData();
   },
 
@@ -362,7 +371,9 @@ const useSoundStore = create((set, get) => ({
         [sound.id]: [...(state.playingSounds[sound.id] || []), instance],
       },
       cooldownTracker: { ...state.cooldownTracker, [sound.id]: now },
+      sounds: state.sounds.map((s) => (s.id === sound.id ? { ...s, playCount: (s.playCount || 0) + 1 } : s)),
     }));
+    get().saveData();
   },
 
   stopAllInstancesOf: (soundId) => {
@@ -477,16 +488,25 @@ const useSoundStore = create((set, get) => ({
   getFilteredSounds: () => {
     const { sounds, activeCategory, searchQuery } = get();
     let filtered = sounds;
-    if (activeCategory !== 'all') {
+    let sortFn = (a, b) => (a.order ?? 0) - (b.order ?? 0);
+
+    if (activeCategory === 'favorites') {
+      filtered = filtered.filter((s) => s.favorite);
+    } else if (activeCategory === 'top') {
+      filtered = filtered.filter((s) => (s.playCount || 0) > 0);
+      sortFn = (a, b) => (b.playCount || 0) - (a.playCount || 0);
+    } else if (activeCategory !== 'all') {
       filtered = filtered.filter((s) => s.categoryId === activeCategory);
     }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (s) => s.name.toLowerCase().includes(q) || (s.chatCommand || '').toLowerCase().includes(q)
       );
     }
-    return [...filtered].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const sorted = [...filtered].sort(sortFn);
+    return activeCategory === 'top' ? sorted.slice(0, 20) : sorted;
   },
 
   getCooldownProgress: (soundId) => {
