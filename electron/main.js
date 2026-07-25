@@ -578,13 +578,6 @@ app.on('before-quit', (e) => {
   })();
 });
 
-// Opens Windows' Sound control panel directly on the Recording tab, so the user can
-// enable "Listen to this device" on CABLE Output (monitor routed/soundboard audio themselves —
-// Windows has no scriptable switch for this checkbox, so we just get them to the right screen).
-ipcMain.handle('open-sound-recording-panel', () => {
-  spawn('rundll32.exe', ['shell32.dll,Control_RunDLL', 'mmsys.cpl,,1'], { detached: true });
-});
-
 ipcMain.handle('app-quit', () => {
   isQuitting = true;
   tray?.destroy();
