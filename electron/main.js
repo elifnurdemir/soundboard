@@ -511,7 +511,7 @@ ipcMain.handle('list-audio-sessions', async () => {
       const exe = exeNameFromRow(row);
       if (!exe) continue;
       const exeLower = exe.toLowerCase();
-      if (VOICE_APP_BLOCKLIST.includes(exeLower) || SYSTEM_NOISE_EXE.includes(exeLower) || seen.has(exeLower)) continue;
+      if (VOICE_APP_BLOCKLIST.has(exeLower) || SYSTEM_NOISE_EXE.has(exeLower) || seen.has(exeLower)) continue;
       seen.add(exeLower);
       apps.push({ exe, name: row.Name || exe });
     }
@@ -522,7 +522,7 @@ ipcMain.handle('list-audio-sessions', async () => {
 });
 
 ipcMain.handle('route-app-to-cable', async (_, exeName) => {
-  if (VOICE_APP_BLOCKLIST.includes((exeName || '').toLowerCase())) {
+  if (VOICE_APP_BLOCKLIST.has((exeName || '').toLowerCase())) {
     return { success: false, error: 'Bu uygulama, sesin geri yankılanmasını önlemek için yönlendirilemez.' };
   }
   try {
