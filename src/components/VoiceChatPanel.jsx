@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import useVoiceChatStore from '../store/useVoiceChatStore';
 import useSoundStore from '../store/useSoundStore';
+import { VoiceChatRouter } from '../audio/VoiceChatRouter';
 
 export default function VoiceChatPanel() {
   const { closeVoiceChat } = useSoundStore();
@@ -13,6 +14,8 @@ export default function VoiceChatPanel() {
   } = useVoiceChatStore();
 
   const [loading, setLoading] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [installMessage, setInstallMessage] = useState('');
 
   useEffect(() => {
     loadDevices();
@@ -38,13 +41,25 @@ export default function VoiceChatPanel() {
     }
   };
 
-  const virtualCables = outputDevices.filter((d) =>
-    d.label.toLowerCase().includes('cable') ||
-    d.label.toLowerCase().includes('virtual') ||
-    d.label.toLowerCase().includes('vb-audio') ||
-    d.label.toLowerCase().includes('voicemeeter')
-  );
+  const virtualCables = outputDevices.filter((d) => VoiceChatRouter.isVirtualCableLabel(d.label));
   const otherDevices = outputDevices.filter((d) => !virtualCables.includes(d));
+
+  const handleInstallVirtualCable = async () => {
+    setInstalling(true);
+    setInstallMessage('');
+    try {
+      const res = await window.electronAPI.installVirtualCable();
+      if (res.success) {
+        setInstallMessage('Kurulum tamamlandı. Bilgisayarını yeniden başlat, sonra buraya dönüp "Cihazları Yenile"ye bas.');
+      } else {
+        setInstallMessage(res.error || 'Kurulum başarısız oldu.');
+      }
+    } catch (err) {
+      setInstallMessage(err.message || 'Kurulum başarısız oldu.');
+    } finally {
+      setInstalling(false);
+    }
+  };
 
   const Toggle = ({ value, onChange, disabled }) => (
     <button
@@ -104,6 +119,27 @@ export default function VoiceChatPanel() {
             <p className="text-[10px] font-mono pt-2 border-t border-app-border" style={{ color: '#3c4238' }}>
               ✓ Discord · OBS · Zoom · Teams · ses kayıt yazılımları
             </p>
+
+            {window.electronAPI && (
+              <div className="pt-2 border-t border-app-border space-y-2">
+                <button
+                  onClick={handleInstallVirtualCable}
+                  disabled={installing}
+                  className="w-full py-2 text-[10px] font-bold font-mono tracking-wider bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] disabled:opacity-50 transition-colors"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  {installing ? 'KURULUYOR...' : '⚡ OTOMATİK KUR'}
+                </button>
+                <p className="text-[9px] font-mono" style={{ color: '#3c4238' }}>
+                  VB-CABLE, VB-Audio'nun donationware ürünüdür — vb-cable.com. Kurulum sırasında bir Windows güvenlik onayı çıkacak.
+                </p>
+                {installMessage && (
+                  <p className="text-[10px] font-mono" style={{ color: installMessage.startsWith('Kurulum tamamlandı') ? '#00ff80' : '#ff6b6b' }}>
+                    {installMessage}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Enable toggle */}

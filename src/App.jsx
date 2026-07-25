@@ -36,9 +36,7 @@ export default function App() {
   useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
-    const html = document.documentElement;
-    if (settings.theme === 'dark') html.classList.add('dark');
-    else html.classList.remove('dark');
+    document.documentElement.dataset.theme = settings.theme || 'dark';
   }, [settings.theme]);
 
   // Global keyboard shortcuts — register with Electron for OS-wide hotkeys

@@ -20,8 +20,31 @@
   --text-3:        #5c665a;
 }
 
+/* ─── Named Accent Themes (dark background, accent color swap only) ───── */
+html[data-theme="ocean"] {
+  --accent:        #22d3ee;
+  --accent-hover:  #4de0f5;
+  --accent-dim:    rgba(34, 211, 238, 0.08);
+  --accent-border: rgba(34, 211, 238, 0.22);
+  --accent-glow:   rgba(34, 211, 238, 0.35);
+}
+html[data-theme="purple"] {
+  --accent:        #c084fc;
+  --accent-hover:  #d3a5fd;
+  --accent-dim:    rgba(192, 132, 252, 0.08);
+  --accent-border: rgba(192, 132, 252, 0.22);
+  --accent-glow:   rgba(192, 132, 252, 0.35);
+}
+html[data-theme="amber"] {
+  --accent:        #ffab2e;
+  --accent-hover:  #ffbf5c;
+  --accent-dim:    rgba(255, 171, 46, 0.08);
+  --accent-border: rgba(255, 171, 46, 0.22);
+  --accent-glow:   rgba(255, 171, 46, 0.35);
+}
+
 /* ─── Light Theme Override ─────────────────────────────────────────────── */
-html:not(.dark) {
+html[data-theme="light"] {
   --accent:        #5a9e00;
   --accent-hover:  #6cb800;
   --accent-dim:    rgba(90, 158, 0, 0.08);
@@ -39,19 +62,19 @@ html:not(.dark) {
   color-scheme: light;
 }
 
-html:not(.dark) body {
+html[data-theme="light"] body {
   background: var(--bg);
   color: var(--text-1);
 }
 
 /* Fix Tailwind text-white in light mode (except on colored buttons/badges) */
-html:not(.dark) .text-white:not(.btn-accent):not([class*="bg-"]) {
+html[data-theme="light"] .text-white:not(.btn-accent):not([class*="bg-"]) {
   color: var(--text-1) !important;
 }
 
 /* Scrollbar for light mode */
-html:not(.dark) ::-webkit-scrollbar-thumb { background: #b5c0b5; }
-html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #9aab97; }
+html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #b5c0b5; }
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #9aab97; }
 
 body {
   background: var(--bg);

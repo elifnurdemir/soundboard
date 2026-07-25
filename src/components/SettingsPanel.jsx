@@ -75,6 +75,14 @@ function Section({ title, children }) {
   );
 }
 
+const THEMES = [
+  { id: 'dark', label: 'Lime', color: '#c4ff00' },
+  { id: 'light', label: 'Açık', color: '#5a9e00' },
+  { id: 'ocean', label: 'Okyanus', color: '#22d3ee' },
+  { id: 'purple', label: 'Mor', color: '#c084fc' },
+  { id: 'amber', label: 'Turuncu', color: '#ffab2e' },
+];
+
 function Row({ label, description, children }) {
   return (
     <div className="flex items-center justify-between gap-3 p-3 bg-app-surface border border-app-border">
@@ -184,28 +192,33 @@ export default function SettingsPanel() {
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {/* Görünüm */}
           <Section title="Görünüm">
-            <Row label="Tema" description="Açık veya koyu tema">
-              <div className="flex overflow-hidden border border-app-border">
-                {["dark", "light"].map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => updateSettings({ theme: t })}
-                    className={`px-3 py-1.5 text-xs font-bold font-mono transition-colors ${
-                      settings.theme === t
-                        ? "text-black"
-                        : "bg-app-surface text-[#5c665a] hover:text-white"
-                    }`}
-                    style={
-                      settings.theme === t
-                        ? { background: "var(--accent)" }
-                        : {}
-                    }
-                  >
-                    {t === "dark" ? "KOYU" : "AÇIK"}
-                  </button>
-                ))}
+            <div className="p-3 bg-app-surface border border-app-border space-y-2">
+              <p className="text-sm font-medium text-white">Tema</p>
+              <div className="flex flex-wrap gap-2">
+                {THEMES.map((t) => {
+                  const active = (settings.theme || 'dark') === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => updateSettings({ theme: t.id })}
+                      title={t.label}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 border text-xs font-bold font-mono transition-colors"
+                      style={{
+                        borderColor: active ? t.color : 'var(--border)',
+                        background: active ? `${t.color}1a` : 'var(--input)',
+                        color: active ? t.color : '#8e9c8b',
+                      }}
+                    >
+                      <span
+                        className="w-3 h-3 rounded-full shrink-0"
+                        style={{ background: t.color, boxShadow: active ? `0 0 6px ${t.color}` : 'none' }}
+                      />
+                      {t.label.toUpperCase()}
+                    </button>
+                  );
+                })}
               </div>
-            </Row>
+            </div>
 
             <Row label="Izgara Sütunları" description="Grid'deki sütun sayısı">
               <select

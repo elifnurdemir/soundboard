@@ -5,6 +5,7 @@ const AdmZip = require('adm-zip');
 const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
+const { spawn } = require('child_process');
 
 const isDev = !app.isPackaged;
 
@@ -276,30 +277,6 @@ const getSoundsFolder = () => {
 
 ipcMain.handle('get-sounds-folder', () => getSoundsFolder());
 
-ipcMain.handle('copy-sound-file', async (_, srcPath) => {
-  try {
-    const folder = getSoundsFolder();
-    const ext = path.extname(srcPath);
-    const base = path.basename(srcPath, ext);
-    let destName = path.basename(srcPath);
-    let destPath = path.join(folder, destName);
-    // Avoid overwriting with a different file
-    let counter = 1;
-    while (fs.existsSync(destPath) && !sameFile(srcPath, destPath)) {
-      destName = `${base}_${counter}${ext}`;
-      destPath = path.join(folder, destName);
-      counter++;
-    }
-    if (!fs.existsSync(destPath)) {
-      fs.copyFileSync(srcPath, destPath);
-      try { fs.unlinkSync(srcPath); } catch (_) {}
-    }
-    return { success: true, destPath };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-});
-
 function sameFile(a, b) {
   try {
     const sa = fs.statSync(a), sb = fs.statSync(b);
@@ -307,9 +284,129 @@ function sameFile(a, b) {
   } catch { return false; }
 }
 
+// Copies (and removes the source of) a file into the sounds folder,
+// renaming on collision with a different file of the same name.
+function moveIntoSoundsFolder(srcPath) {
+  const folder = getSoundsFolder();
+  const ext = path.extname(srcPath);
+  const base = path.basename(srcPath, ext);
+  let destName = path.basename(srcPath);
+  let destPath = path.join(folder, destName);
+  let counter = 1;
+  while (fs.existsSync(destPath) && !sameFile(srcPath, destPath)) {
+    destName = `${base}_${counter}${ext}`;
+    destPath = path.join(folder, destName);
+    counter++;
+  }
+  if (!fs.existsSync(destPath)) {
+    fs.copyFileSync(srcPath, destPath);
+    try { fs.unlinkSync(srcPath); } catch (_) {}
+  }
+  return destPath;
+}
+
+ipcMain.handle('copy-sound-file', async (_, srcPath) => {
+  try {
+    return { success: true, destPath: moveIntoSoundsFolder(srcPath) };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 ipcMain.handle('open-sounds-folder', () => {
   const folder = getSoundsFolder();
   shell.openPath(folder);
+});
+
+// ─── YouTube Audio Download ───────────────────────────────────────────────────
+const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)/i;
+
+function getYtDlpPath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'bin', 'yt-dlp.exe')
+    : path.join(__dirname, 'bin', 'yt-dlp.exe');
+}
+
+ipcMain.handle('download-youtube-audio', async (_, url) => {
+  if (!YOUTUBE_URL_RE.test(url || '')) {
+    return { success: false, error: 'Geçersiz YouTube linki' };
+  }
+
+  const ytDlpPath = getYtDlpPath();
+  if (!fs.existsSync(ytDlpPath)) {
+    return { success: false, error: 'yt-dlp bulunamadı. "npm install" çalıştırıldığından emin ol.' };
+  }
+
+  try {
+    const YTDlpWrap = require('yt-dlp-wrap-plus').default;
+    const ytDlpWrap = new YTDlpWrap(ytDlpPath);
+
+    const tmpDir = path.join(app.getPath('temp'), 'soundboard-yt');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const outputTemplate = path.join(tmpDir, '%(title).80s.%(ext)s');
+
+    let stdoutBuf = '';
+    const tmpFilePath = await new Promise((resolve, reject) => {
+      const emitter = ytDlpWrap.exec([
+        url,
+        '-f', 'bestaudio',
+        '--no-playlist',
+        '--restrict-filenames',
+        '-o', outputTemplate,
+        '--print', 'after_move:filepath',
+      ]);
+
+      emitter.ytDlpProcess?.stdout?.on('data', (d) => { stdoutBuf += d.toString(); });
+      emitter.on('progress', (p) => {
+        if (typeof p.percent === 'number') mainWindow?.webContents.send('youtube-download-progress', p.percent);
+      });
+      emitter.on('error', (err) => reject(err));
+      emitter.on('close', () => {
+        const lines = stdoutBuf.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        const lastLine = lines[lines.length - 1];
+        if (lastLine && fs.existsSync(lastLine)) resolve(lastLine);
+        else reject(new Error('İndirilen dosya bulunamadı'));
+      });
+    });
+
+    const destPath = moveIntoSoundsFolder(tmpFilePath);
+    const title = path.basename(destPath, path.extname(destPath));
+    return { success: true, destPath, title };
+  } catch (err) {
+    console.error('YouTube download error:', err);
+    return { success: false, error: err.message || 'İndirme başarısız oldu' };
+  }
+});
+
+// ─── Virtual Audio Cable (VB-CABLE) install ──────────────────────────────────
+// Bundled per VB-Audio's donationware redistribution terms (vb-audio.com/Services/licensing.htm):
+// origin (vb-cable.com) and donationware nature must stay visible to the end user (see VoiceChatPanel.jsx).
+function getVbCablePath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'bin', 'vbcable', 'VBCABLE_Setup_x64.exe')
+    : path.join(__dirname, 'bin', 'vbcable', 'VBCABLE_Setup_x64.exe');
+}
+
+ipcMain.handle('install-virtual-cable', async () => {
+  const vbCablePath = getVbCablePath();
+  if (!fs.existsSync(vbCablePath)) {
+    return { success: false, error: 'VB-CABLE kurulum dosyası bulunamadı. "npm install" çalıştırıldığından emin ol.' };
+  }
+
+  // Windows always shows its own "unverified publisher" driver prompt here — cannot be
+  // silenced from the command line. -Verb RunAs elevates just this one process (UAC).
+  return new Promise((resolve) => {
+    const psCommand = `Start-Process -FilePath '${vbCablePath}' -ArgumentList '-i -h' -Verb RunAs -Wait`;
+    const powershellPath = path.join(process.env.SystemRoot || String.raw`C:\Windows`, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+    const proc = spawn(powershellPath, ['-NoProfile', '-Command', psCommand]);
+    let stderr = '';
+    proc.stderr?.on('data', (d) => { stderr += d.toString(); });
+    proc.on('error', (err) => resolve({ success: false, error: err.message }));
+    proc.on('close', (code) => {
+      if (code === 0) resolve({ success: true, rebootRequired: true });
+      else resolve({ success: false, error: stderr.trim() || 'Kurulum reddedildi veya başarısız oldu.' });
+    });
+  });
 });
 
 ipcMain.handle('app-quit', () => {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import useSoundStore, { PRESET_COLORS, randomColor } from '../store/useSoundStore';
-import WaveformDisplay from './WaveformDisplay';
+import AudioTrimEditor from './AudioTrimEditor';
 
 function ColorPicker({ value, onChange }) {
   return (
@@ -129,11 +129,48 @@ export default function AddSoundModal() {
   const [loop, setLoop] = useState(editingSound?.loop ?? false);
   const [fadeIn, setFadeIn] = useState(editingSound?.fadeIn ?? 0);
   const [fadeOut, setFadeOut] = useState(editingSound?.fadeOut ?? 0);
+  const [trimStart, setTrimStart] = useState(editingSound?.trimStart ?? 0);
+  const [trimEnd, setTrimEnd] = useState(editingSound?.trimEnd ?? null);
   const [cooldown, setCooldown] = useState(editingSound?.cooldown ?? 0);
   const [overlap, setOverlap] = useState(editingSound?.overlap ?? true);
   const [chatCommand, setChatCommand] = useState(editingSound?.chatCommand || '');
   const [noColor, setNoColor] = useState(editingSound?.noColor ?? false);
   const [activeTab, setActiveTab] = useState('basic');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadError, setDownloadError] = useState('');
+
+  const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)/i;
+
+  const handleYoutubeDownload = async () => {
+    if (!YOUTUBE_URL_RE.test(youtubeUrl.trim())) {
+      setDownloadError('Geçersiz YouTube linki');
+      return;
+    }
+    setDownloadError('');
+    setDownloading(true);
+    setDownloadProgress(0);
+    window.electronAPI.onYoutubeProgress(setDownloadProgress);
+    try {
+      const res = await window.electronAPI.downloadYoutubeAudio(youtubeUrl.trim());
+      if (res.success) {
+        setFilePath(res.destPath);
+        setFileName(res.destPath.split(/[\\/]/).pop());
+        if (!name) setName(res.title);
+        setTrimStart(0);
+        setTrimEnd(null);
+        setYoutubeUrl('');
+      } else {
+        setDownloadError(res.error || 'İndirme başarısız oldu');
+      }
+    } catch (err) {
+      setDownloadError(err.message || 'İndirme başarısız oldu');
+    } finally {
+      window.electronAPI.offYoutubeProgress();
+      setDownloading(false);
+    }
+  };
 
   const handleFileSelect = async () => {
     if (window.electronAPI) {
@@ -147,6 +184,8 @@ export default function AddSoundModal() {
         const fn = fp.split(/[\\/]/).pop();
         setFileName(fn);
         if (!name) setName(fn.replace(/\.[^.]+$/, ''));
+        setTrimStart(0);
+        setTrimEnd(null);
       }
     } else {
       // Tarayıcı: standart file input
@@ -161,6 +200,8 @@ export default function AddSoundModal() {
         setFilePath(blobUrl);
         setFileName(file.name);
         if (!name) setName(file.name.replace(/\.[^.]+$/, ''));
+        setTrimStart(0);
+        setTrimEnd(null);
       };
       input.click();
     }
@@ -199,7 +240,7 @@ export default function AddSoundModal() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!filePath && !isEditing) return;
-    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, cooldown, overlap, chatCommand, image: imagePath || '', noColor: imagePath ? noColor : false };
+    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, trimStart, trimEnd, cooldown, overlap, chatCommand, image: imagePath || '', noColor: imagePath ? noColor : false };
     if (filePath) data.filePath = filePath;
     if (isEditing) updateSound(editingSound.id, data);
     else addSound({ ...data, filePath });
@@ -295,9 +336,42 @@ export default function AddSoundModal() {
                     </button>
                   )}
                   </div>
+
+                  {window.electronAPI && (
+                    <div className="mt-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={youtubeUrl}
+                          onChange={(e) => { setYoutubeUrl(e.target.value); setDownloadError(''); }}
+                          placeholder="YouTube linki yapıştır..."
+                          disabled={downloading}
+                          className="flex-1 bg-app-input border border-app-border px-3 py-2 text-sm text-white outline-none focus-lime font-mono placeholder-[#3c4238] disabled:opacity-50"
+                        />
+                        <button
+                          type="button" onClick={handleYoutubeDownload}
+                          disabled={downloading || !youtubeUrl.trim()}
+                          className="px-3 py-2 bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] text-xs font-bold font-mono tracking-wider disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+                          style={{ color: 'var(--accent)' }}
+                        >
+                          {downloading ? `İNDİRİLİYOR... %${Math.round(downloadProgress)}` : 'İNDİR'}
+                        </button>
+                      </div>
+                      {downloadError && (
+                        <p className="text-[10px] font-mono mt-1 text-red-400">{downloadError}</p>
+                      )}
+                    </div>
+                  )}
+
                   {filePath && (
                     <div className="mt-2 p-2 bg-app-bg border border-app-border">
-                      <WaveformDisplay filePath={filePath} color={color} height={48} bars={80}/>
+                      <AudioTrimEditor
+                        filePath={filePath}
+                        trimStart={trimStart}
+                        trimEnd={trimEnd}
+                        color={color}
+                        onChange={({ trimStart: ts, trimEnd: te }) => { setTrimStart(ts); setTrimEnd(te); }}
+                      />
                     </div>
                   )}
                 </div>

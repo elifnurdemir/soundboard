@@ -33,8 +33,8 @@ function hslToHex(h,s,l){
 export function randomColor(theme='dark'){
   const h=Math.floor(Math.random()*360);
   const s=42+Math.floor(Math.random()*28); // 42–70%
-  const l=theme==='dark'
-    ?22+Math.floor(Math.random()*22)  // 22–44%
+  const l=theme!=='light'
+    ?22+Math.floor(Math.random()*22)  // 22–44% — any dark-background theme
     :44+Math.floor(Math.random()*22); // 44–66%
   return hslToHex(h,s,l);
 }
@@ -178,6 +178,8 @@ const useSoundStore = create((set, get) => ({
       loop: data.loop ?? false,
       fadeIn: data.fadeIn ?? 0,
       fadeOut: data.fadeOut ?? 0,
+      trimStart: data.trimStart ?? 0,
+      trimEnd: data.trimEnd ?? null,
       cooldown: data.cooldown ?? 0,
       overlap: data.overlap ?? true,
       chatCommand: data.chatCommand || '',
@@ -266,9 +268,16 @@ const useSoundStore = create((set, get) => ({
 
     const url = buildAudioUrl(sound.filePath);
     const targetVol = Math.min(1, (sound.volume ?? 0.8) * (settings.globalVolume ?? 1));
+    const hasTrim = (sound.trimStart ?? 0) > 0 || sound.trimEnd != null;
 
     const audio = new Audio(url);
-    audio.loop = sound.loop ?? false;
+    audio.loop = (sound.loop ?? false) && !hasTrim;
+
+    if ((sound.trimStart ?? 0) > 0) {
+      audio.addEventListener('loadedmetadata', () => {
+        audio.currentTime = sound.trimStart;
+      }, { once: true });
+    }
 
     // Fade in
     if (sound.fadeIn > 0) {
@@ -292,15 +301,33 @@ const useSoundStore = create((set, get) => ({
       get()._playNextFromQueue();
     };
 
+    let stopped = false;
+    const stopAndCleanup = () => {
+      if (stopped) return;
+      stopped = true;
+      audio.pause();
+      cleanup();
+    };
+
     if (!sound.loop) {
-      audio.addEventListener('ended', cleanup);
+      audio.addEventListener('ended', stopAndCleanup);
     }
     audio.addEventListener('error', cleanup);
 
-    // Fade out before end
-    if (!sound.loop && sound.fadeOut > 0) {
-      audio.addEventListener('timeupdate', () => {
-        const remaining = audio.duration - audio.currentTime;
+    // Trim end / loop-within-trim / fade-out — driven off currentTime vs. trim end
+    audio.addEventListener('timeupdate', () => {
+      const end = sound.trimEnd != null ? sound.trimEnd : audio.duration;
+      if (!end || isNaN(end)) return;
+
+      if (sound.loop) {
+        if (hasTrim && audio.currentTime >= end) {
+          audio.currentTime = sound.trimStart || 0;
+        }
+        return;
+      }
+
+      if (sound.fadeOut > 0) {
+        const remaining = end - audio.currentTime;
         if (remaining > 0 && remaining <= (sound.fadeOut ?? 0) && audio.volume > 0) {
           const instances = get().playingSounds[sound.id] || [];
           const inst = instances.find((i) => i.audio === audio);
@@ -309,8 +336,12 @@ const useSoundStore = create((set, get) => ({
             rampVolume(audio, audio.volume, 0, remaining * 1000);
           }
         }
-      });
-    }
+      }
+
+      if (audio.currentTime >= end) {
+        stopAndCleanup();
+      }
+    });
 
     audio.play().catch((e) => {
       console.error(`Play "${sound.name}":`, e.message);

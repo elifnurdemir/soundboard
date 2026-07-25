@@ -1,6 +1,6 @@
 {
   "name": "soundboard",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Soundboard Desktop Application",
   "main": "electron/main.js",
   "scripts": {
@@ -12,6 +12,7 @@
     "dist": "vite build && electron-builder --win --x64",
     "dist:dir": "vite build && electron-builder --win --x64 --dir",
     "icon": "node scripts/generate-icon.js",
+    "postinstall": "node scripts/download-ytdlp.js && node scripts/download-vbcable.js",
     "clean-release": "node scripts/clean-release.js",
     "release": "npm version patch --no-git-tag-version && node scripts/clean-release.js && node scripts/generate-icon.js && vite build && electron-builder --win --x64 --publish always"
   },
@@ -26,7 +27,11 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "!electron/bin/**",
       "package.json"
+    ],
+    "extraResources": [
+      { "from": "electron/bin", "to": "bin" }
     ],
     "forceCodeSigning": false,
     "npmRebuild": false,
@@ -53,13 +58,15 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Soundboard"
+      "shortcutName": "Soundboard",
+      "include": "build-assets/installer.nsh"
     }
   },
   "dependencies": {
     "adm-zip": "^0.5.17",
     "electron-updater": "^6.8.3",
-    "uiohook-napi": "^1.5.5"
+    "uiohook-napi": "^1.5.5",
+    "yt-dlp-wrap-plus": "^2.4.3"
   },
   "devDependencies": {
     "@dnd-kit/core": "^6.3.1",

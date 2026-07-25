@@ -13,6 +13,15 @@ const useVoiceChatStore = create((set, get) => ({
     try {
       const devices = await VoiceChatRouter.getOutputDevices();
       set({ outputDevices: devices, error: null });
+
+      // Auto-configure: if nothing selected yet, pick the first virtual cable found
+      if (!get().virtualDeviceId) {
+        const cable = devices.find((d) => VoiceChatRouter.isVirtualCableLabel(d.label));
+        if (cable) {
+          await get().setVirtualDevice(cable.id);
+          get().setEnabled(true);
+        }
+      }
     } catch (err) {
       set({ error: err.message });
     }

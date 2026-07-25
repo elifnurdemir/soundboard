@@ -28,6 +28,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', () => cb()),
 
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  downloadYoutubeAudio: (url) => ipcRenderer.invoke('download-youtube-audio', url),
+  onYoutubeProgress: (cb) => ipcRenderer.on('youtube-download-progress', (_, pct) => cb(pct)),
+  offYoutubeProgress: () => ipcRenderer.removeAllListeners('youtube-download-progress'),
+  installVirtualCable: () => ipcRenderer.invoke('install-virtual-cable'),
   exportZip: (data) => ipcRenderer.invoke('export-zip', data),
   importZip: () => ipcRenderer.invoke('import-zip'),
 

@@ -109,6 +109,12 @@ class VoiceChatRouter {
     return audio;
   }
 
+  /** Whether a device label looks like a virtual audio cable (VB-CABLE, VoiceMeeter, ...) */
+  static isVirtualCableLabel(label) {
+    const l = (label || '').toLowerCase();
+    return l.includes('cable') || l.includes('virtual') || l.includes('vb-audio') || l.includes('voicemeeter');
+  }
+
   /** Enumerate all audio output devices */
   static async getOutputDevices() {
     try {
