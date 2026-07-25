@@ -1,6 +1,6 @@
 {
   "name": "soundboard",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Soundboard Desktop Application",
   "main": "electron/main.js",
   "scripts": {
@@ -31,7 +31,10 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "electron/bin", "to": "bin" }
+      {
+        "from": "electron/bin",
+        "to": "bin"
+      }
     ],
     "forceCodeSigning": false,
     "npmRebuild": false,
