@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import useSoundStore from './store/useSoundStore';
 import useStreamStore from './store/useStreamStore';
+import useLicenseStore from './store/useLicenseStore';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import SoundGrid from './components/SoundGrid';
@@ -32,13 +33,20 @@ export default function App() {
   } = useSoundStore();
 
   const { onChatCommand } = useStreamStore();
+  const licenseStatus = useLicenseStore((s) => s.status);
   const unsubRef = useRef(null);
 
   useEffect(() => { loadData(); }, []);
+  useEffect(() => { useLicenseStore.getState().checkStatus(); }, []);
 
+  // Premium themes only actually apply for Pro — even if a tampered-with settings file
+  // claims one, we fall back to the free default rather than trusting the client state.
   useEffect(() => {
-    document.documentElement.dataset.theme = settings.theme || 'dark';
-  }, [settings.theme]);
+    const FREE_THEMES = new Set(['dark', 'light']);
+    const requested = settings.theme || 'dark';
+    const allowed = FREE_THEMES.has(requested) || licenseStatus === 'pro';
+    document.documentElement.dataset.theme = allowed ? requested : 'dark';
+  }, [settings.theme, licenseStatus]);
 
   // Global drag & drop — drop an audio/video file anywhere to open "Ses Ekle" with it preloaded.
   // Skipped while a modal is already open — its own dropzone handles that case.

@@ -2,10 +2,11 @@ const { app, BrowserWindow, ipcMain, dialog, protocol, Tray, Menu, nativeImage, 
 const { uIOhook, UiohookKey } = require('uiohook-napi');
 const { autoUpdater } = require('electron-updater');
 const AdmZip = require('adm-zip');
-const path = require('path');
-const fs = require('fs');
-const zlib = require('zlib');
-const { spawn } = require('child_process');
+const path = require('node:path');
+const fs = require('node:fs');
+const zlib = require('node:zlib');
+const os = require('node:os');
+const { spawn } = require('node:child_process');
 
 const isDev = !app.isPackaged;
 
@@ -213,6 +214,98 @@ ipcMain.handle('save-data', async (_, data) => {
 
 ipcMain.handle('get-data-path', () => getDataPath());
 
+// ─── Licensing (LemonSqueezy) ───────────────────────────────────────────────────
+// Deliberately stored OUTSIDE soundboard-data.json — must never travel through
+// export-zip/import-zip, or a license would get copied along with someone's sounds.
+// TODO: replace with the real LemonSqueezy hosted checkout URL once the product exists.
+const LEMONSQUEEZY_CHECKOUT_URL = 'https://YOUR-STORE.lemonsqueezy.com/buy/YOUR-PRODUCT-ID';
+const LICENSE_REVALIDATE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const getLicensePath = () => path.join(app.getPath('userData'), 'license.json');
+
+function readLicenseFile() {
+  try {
+    const p = getLicensePath();
+    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf-8'));
+  } catch (_) { /* corrupt/missing — treat as free */ }
+  return null;
+}
+
+function writeLicenseFile(data) {
+  fs.writeFileSync(getLicensePath(), JSON.stringify(data, null, 2), 'utf-8');
+}
+
+// Enforcement lives here, not just in the renderer's ProGate UI — a locked-out user
+// poking at React state or calling window.electronAPI directly from DevTools still
+// hits this same check, since the privileged action itself refuses to run without it.
+function requireProOrError() {
+  const stored = readLicenseFile();
+  if (stored?.status === 'pro') return null;
+  return { success: false, error: 'Bu özellik Pro sürümde açılıyor. Ayarlar > Pro bölümünden satın alabilirsin.' };
+}
+
+async function lemonSqueezyRequest(endpoint, params) {
+  const res = await fetch(`https://api.lemonsqueezy.com/v1/licenses/${endpoint}`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(params).toString(),
+  });
+  return res.json();
+}
+
+ipcMain.handle('activate-license', async (_, licenseKey) => {
+  try {
+    const data = await lemonSqueezyRequest('activate', { license_key: licenseKey, instance_name: os.hostname() });
+    if (!data.activated) {
+      return { success: false, error: data.error || 'Lisans anahtarı geçersiz.' };
+    }
+    writeLicenseFile({
+      status: 'pro',
+      licenseKey,
+      instanceId: data.instance?.id,
+      lastValidatedAt: Date.now(),
+    });
+    return { success: true, status: 'pro' };
+  } catch (err) {
+    return { success: false, error: 'Doğrulanamadı — internet bağlantısını kontrol et.' };
+  }
+});
+
+ipcMain.handle('get-license-status', async () => {
+  const stored = readLicenseFile();
+  if (stored?.status !== 'pro') return { status: 'free' };
+
+  const isStale = Date.now() - (stored.lastValidatedAt || 0) > LICENSE_REVALIDATE_MS;
+  if (isStale) {
+    try {
+      const data = await lemonSqueezyRequest('validate', { license_key: stored.licenseKey, instance_id: stored.instanceId });
+      if (data.valid) {
+        writeLicenseFile({ ...stored, lastValidatedAt: Date.now() });
+      } else {
+        // Revoked/refunded — drop back to free.
+        try { fs.unlinkSync(getLicensePath()); } catch (_) { /* already gone */ }
+        return { status: 'free' };
+      }
+    } catch (_) {
+      // Offline — trust the cached state rather than locking the user out.
+    }
+  }
+  return { status: 'pro' };
+});
+
+ipcMain.handle('deactivate-license', async () => {
+  const stored = readLicenseFile();
+  if (stored?.licenseKey && stored?.instanceId) {
+    try {
+      await lemonSqueezyRequest('deactivate', { license_key: stored.licenseKey, instance_id: stored.instanceId });
+    } catch (_) { /* server-side deactivation is best-effort — local file is removed regardless */ }
+  }
+  try { fs.unlinkSync(getLicensePath()); } catch (_) { /* already gone */ }
+  return { success: true };
+});
+
+ipcMain.handle('open-checkout', () => shell.openExternal(LEMONSQUEEZY_CHECKOUT_URL));
+
 // ─── File Dialog ───────────────────────────────────────────────────────────────
 ipcMain.handle('open-file-dialog', async () => {
   if (!mainWindow) return { canceled: true, filePaths: [] };
@@ -251,7 +344,7 @@ ipcMain.handle('copy-image-file', async (_, srcPath) => {
     }
     if (!fs.existsSync(destPath)) {
       fs.copyFileSync(srcPath, destPath);
-      try { fs.unlinkSync(srcPath); } catch (_) {}
+      try { fs.unlinkSync(srcPath); } catch (_) { /* original may be read-only/in-use — copy already succeeded */ }
     }
     return { success: true, destPath };
   } catch (err) {
@@ -310,7 +403,7 @@ function moveIntoSoundsFolder(srcPath) {
   }
   if (!fs.existsSync(destPath)) {
     fs.copyFileSync(srcPath, destPath);
-    try { fs.unlinkSync(srcPath); } catch (_) {}
+    try { fs.unlinkSync(srcPath); } catch (_) { /* original may be read-only/in-use — copy already succeeded */ }
   }
   return destPath;
 }
@@ -349,6 +442,9 @@ function getYtDlpPath() {
 }
 
 ipcMain.handle('download-youtube-audio', async (_, url) => {
+  const proError = requireProOrError();
+  if (proError) return proError;
+
   if (!YOUTUBE_URL_RE.test(url || '')) {
     return { success: false, error: 'Geçersiz YouTube linki' };
   }
@@ -384,7 +480,7 @@ ipcMain.handle('download-youtube-audio', async (_, url) => {
       emitter.on('error', (err) => reject(err));
       emitter.on('close', () => {
         const lines = stdoutBuf.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-        const lastLine = lines[lines.length - 1];
+        const lastLine = lines.at(-1);
         if (lastLine && fs.existsSync(lastLine)) resolve(lastLine);
         else reject(new Error('İndirilen dosya bulunamadı'));
       });
@@ -409,6 +505,9 @@ function getVbCablePath() {
 }
 
 ipcMain.handle('install-virtual-cable', async () => {
+  const proError = requireProOrError();
+  if (proError) return proError;
+
   const vbCablePath = getVbCablePath();
   if (!fs.existsSync(vbCablePath)) {
     return { success: false, error: 'VB-CABLE kurulum dosyası bulunamadı. "npm install" çalıştırıldığından emin ol.' };
@@ -591,6 +690,9 @@ ipcMain.handle('list-audio-sessions', async () => {
 });
 
 ipcMain.handle('route-app-to-cable', async (_, exeName) => {
+  const proError = requireProOrError();
+  if (proError) return proError;
+
   if (VOICE_APP_BLOCKLIST.has((exeName || '').toLowerCase())) {
     return { success: false, error: 'Bu uygulama, sesin geri yankılanmasını önlemek için yönlendirilemez.' };
   }

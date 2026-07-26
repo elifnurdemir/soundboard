@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import useSoundStore from "../store/useSoundStore";
+import useLicenseStore from "../store/useLicenseStore";
+import ProGate from "./ProGate";
 
 function UpdateChecker() {
   const [status, setStatus] = useState('idle'); // idle | checking | latest | available | downloading | ready
@@ -82,6 +84,75 @@ const THEMES = [
   { id: 'purple', label: 'Mor', color: '#c084fc' },
   { id: 'amber', label: 'Turuncu', color: '#ffab2e' },
 ];
+const FREE_THEME_IDS = new Set(['dark', 'light']);
+
+function LicenseSection() {
+  const { status, activate, deactivate, error } = useLicenseStore();
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const isPro = status === 'pro';
+
+  const handleActivate = async () => {
+    if (!key.trim()) return;
+    setBusy(true);
+    const res = await activate(key);
+    setBusy(false);
+    if (res.success) setKey('');
+  };
+
+  return (
+    <div className="p-3 bg-app-surface border border-app-border space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold text-white">Lisans Durumu</p>
+        <span
+          className="text-[10px] px-1.5 py-0.5 font-mono font-bold"
+          style={isPro
+            ? { background: 'rgba(196,255,0,0.12)', color: 'var(--accent)' }
+            : { background: 'var(--app-raised)', color: '#5c665a' }
+          }
+        >
+          {isPro ? 'PRO' : 'ÜCRETSİZ'}
+        </span>
+      </div>
+
+      {isPro ? (
+        <button
+          onClick={deactivate}
+          className="w-full py-2 text-[10px] font-bold font-mono tracking-wider bg-app-input border border-app-border hover:border-red-500/40 hover:text-red-400 text-[#5c665a] transition-colors"
+        >
+          BU CİHAZDAN KALDIR
+        </button>
+      ) : (
+        <>
+          <button
+            onClick={() => window.electronAPI?.openCheckout()}
+            className="w-full py-2 text-[10px] font-bold font-mono tracking-wider btn-accent"
+          >
+            SATIN AL
+          </button>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder="Lisans anahtarını yapıştır..."
+              className="flex-1 bg-app-input border border-app-border px-3 py-2 text-sm text-white outline-none focus-lime font-mono placeholder-[#3c4238]"
+            />
+            <button
+              onClick={handleActivate}
+              disabled={busy || !key.trim()}
+              className="px-3 py-2 bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] text-xs font-bold font-mono tracking-wider disabled:opacity-40 transition-colors shrink-0"
+              style={{ color: 'var(--accent)' }}
+            >
+              {busy ? '...' : 'DOĞRULA'}
+            </button>
+          </div>
+          {error && <p className="text-[10px] font-mono text-red-400">{error}</p>}
+        </>
+      )}
+    </div>
+  );
+}
 
 function Row({ label, description, children }) {
   return (
@@ -197,9 +268,8 @@ export default function SettingsPanel() {
               <div className="flex flex-wrap gap-2">
                 {THEMES.map((t) => {
                   const active = (settings.theme || 'dark') === t.id;
-                  return (
+                  const button = (
                     <button
-                      key={t.id}
                       onClick={() => updateSettings({ theme: t.id })}
                       title={t.label}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 border text-xs font-bold font-mono transition-colors"
@@ -216,6 +286,9 @@ export default function SettingsPanel() {
                       {t.label.toUpperCase()}
                     </button>
                   );
+                  return FREE_THEME_IDS.has(t.id)
+                    ? <div key={t.id}>{button}</div>
+                    : <ProGate key={t.id} feature="Ekstra temalar">{button}</ProGate>;
                 })}
               </div>
             </div>
@@ -236,6 +309,11 @@ export default function SettingsPanel() {
                 ))}
               </select>
             </Row>
+          </Section>
+
+          {/* Pro */}
+          <Section title="Pro">
+            <LicenseSection />
           </Section>
 
           {/* Ses */}

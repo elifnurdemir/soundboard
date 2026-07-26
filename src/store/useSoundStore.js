@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { voiceChatRouter } from '../audio/VoiceChatRouter';
+import useLicenseStore from './useLicenseStore';
 
 export const PRESET_COLORS = [
   '#7d2626', '#7d4220', '#7a5010', '#4a6318',
@@ -281,9 +282,13 @@ const useSoundStore = create((set, get) => ({
     const targetVol = Math.min(1, (sound.volume ?? 0.8) * (settings.globalVolume ?? 1));
     const hasTrim = (sound.trimStart ?? 0) > 0 || sound.trimEnd != null;
 
+    // Pro-only effect — only applied for licensed users, even if a stale/tampered-with
+    // sound record on disk carries a non-default rate (defense in depth, not just hiding the UI).
+    const effectiveRate = useLicenseStore.getState().isPro() ? (sound.playbackRate ?? 1) : 1;
+
     const audio = new Audio(url);
     audio.loop = (sound.loop ?? false) && !hasTrim;
-    audio.playbackRate = sound.playbackRate ?? 1;
+    audio.playbackRate = effectiveRate;
     audio.preservesPitch = false; // let rate changes shift pitch too — chipmunk/deep-voice effect
 
     if ((sound.trimStart ?? 0) > 0) {
@@ -330,7 +335,7 @@ const useSoundStore = create((set, get) => ({
     // Trim end / loop-within-trim / fade-out — driven off currentTime vs. trim end
     audio.addEventListener('timeupdate', () => {
       const end = sound.trimEnd != null ? sound.trimEnd : audio.duration;
-      if (!end || isNaN(end)) return;
+      if (!end || Number.isNaN(end)) return;
 
       if (sound.loop) {
         if (hasTrim && audio.currentTime >= end) {
@@ -364,8 +369,8 @@ const useSoundStore = create((set, get) => ({
     // Voice chat: also play on virtual device
     let vcAudio = null;
     try {
-      vcAudio = await voiceChatRouter.playOnVirtualDevice(url, targetVol, sound.loop ?? false, sound.playbackRate ?? 1);
-    } catch (_) {}
+      vcAudio = await voiceChatRouter.playOnVirtualDevice(url, targetVol, sound.loop ?? false, effectiveRate);
+    } catch (_) { /* virtual cable optional — regular playback above already started */ }
 
     const instance = { audio, vcAudio, _fadingOut: false };
 

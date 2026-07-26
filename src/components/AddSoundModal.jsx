@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import useSoundStore, { PRESET_COLORS, randomColor } from '../store/useSoundStore';
 import AudioTrimEditor from './AudioTrimEditor';
+import ProGate from './ProGate';
 
 function ColorPicker({ value, onChange }) {
   return (
@@ -429,29 +430,31 @@ export default function AddSoundModal() {
                   </div>
 
                   {window.electronAPI && (
-                    <div className="mt-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={youtubeUrl}
-                          onChange={(e) => { setYoutubeUrl(e.target.value); setDownloadError(''); }}
-                          placeholder="YouTube linki yapıştır..."
-                          disabled={downloading}
-                          className="flex-1 bg-app-input border border-app-border px-3 py-2 text-sm text-white outline-none focus-lime font-mono placeholder-[#3c4238] disabled:opacity-50"
-                        />
-                        <button
-                          type="button" onClick={handleYoutubeDownload}
-                          disabled={downloading || !youtubeUrl.trim()}
-                          className="px-3 py-2 bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] text-xs font-bold font-mono tracking-wider disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
-                          style={{ color: 'var(--accent)' }}
-                        >
-                          {downloading ? `İNDİRİLİYOR... %${Math.round(downloadProgress)}` : 'İNDİR'}
-                        </button>
+                    <ProGate feature="YouTube linkinden ekleme">
+                      <div className="mt-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={youtubeUrl}
+                            onChange={(e) => { setYoutubeUrl(e.target.value); setDownloadError(''); }}
+                            placeholder="YouTube linki yapıştır..."
+                            disabled={downloading}
+                            className="flex-1 bg-app-input border border-app-border px-3 py-2 text-sm text-white outline-none focus-lime font-mono placeholder-[#3c4238] disabled:opacity-50"
+                          />
+                          <button
+                            type="button" onClick={handleYoutubeDownload}
+                            disabled={downloading || !youtubeUrl.trim()}
+                            className="px-3 py-2 bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] text-xs font-bold font-mono tracking-wider disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+                            style={{ color: 'var(--accent)' }}
+                          >
+                            {downloading ? `İNDİRİLİYOR... %${Math.round(downloadProgress)}` : 'İNDİR'}
+                          </button>
+                        </div>
+                        {downloadError && (
+                          <p className="text-[10px] font-mono mt-1 text-red-400">{downloadError}</p>
+                        )}
                       </div>
-                      {downloadError && (
-                        <p className="text-[10px] font-mono mt-1 text-red-400">{downloadError}</p>
-                      )}
-                    </div>
+                    </ProGate>
                   )}
 
                   <div className="mt-2">
@@ -590,7 +593,7 @@ export default function AddSoundModal() {
                   </label>
                   <input
                     type="range" min="0" max="1" step="0.01"
-                    value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))}
+                    value={volume} onChange={(e) => setVolume(Number.parseFloat(e.target.value))}
                     className="w-full volume-slider"
                   />
                 </div>
@@ -602,7 +605,7 @@ export default function AddSoundModal() {
                   </label>
                   <input
                     type="range" min="0" max="5" step="0.1"
-                    value={fadeIn} onChange={(e) => setFadeIn(parseFloat(e.target.value))}
+                    value={fadeIn} onChange={(e) => setFadeIn(Number.parseFloat(e.target.value))}
                     className="w-full volume-slider"
                   />
                 </div>
@@ -614,25 +617,27 @@ export default function AddSoundModal() {
                   </label>
                   <input
                     type="range" min="0" max="5" step="0.1"
-                    value={fadeOut} onChange={(e) => setFadeOut(parseFloat(e.target.value))}
+                    value={fadeOut} onChange={(e) => setFadeOut(Number.parseFloat(e.target.value))}
                     className="w-full volume-slider"
                   />
                 </div>
 
-                <div>
-                  <label className={labelCls} style={{ color: '#8e9c8b' }}>
-                    Hız / Perde —{' '}
-                    <span className="font-mono" style={{ color: 'var(--accent)' }}>{playbackRate === 1 ? 'NORMAL' : `${playbackRate.toFixed(2)}x`}</span>
-                  </label>
-                  <input
-                    type="range" min="0.5" max="2" step="0.05"
-                    value={playbackRate} onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
-                    className="w-full volume-slider"
-                  />
-                  <p className="text-[10px] font-mono mt-1" style={{ color: '#3c4238' }}>
-                    1x'ten düşük = kalın/yavaş ses, yüksek = ince/hızlı ses (sincap efekti)
-                  </p>
-                </div>
+                <ProGate feature="Hız/Perde efekti">
+                  <div>
+                    <label className={labelCls} style={{ color: '#8e9c8b' }}>
+                      Hız / Perde —{' '}
+                      <span className="font-mono" style={{ color: 'var(--accent)' }}>{playbackRate === 1 ? 'NORMAL' : `${playbackRate.toFixed(2)}x`}</span>
+                    </label>
+                    <input
+                      type="range" min="0.5" max="2" step="0.05"
+                      value={playbackRate} onChange={(e) => setPlaybackRate(Number.parseFloat(e.target.value))}
+                      className="w-full volume-slider"
+                    />
+                    <p className="text-[10px] font-mono mt-1" style={{ color: '#3c4238' }}>
+                      1x'ten düşük = kalın/yavaş ses, yüksek = ince/hızlı ses (sincap efekti)
+                    </p>
+                  </div>
+                </ProGate>
 
                 <Toggle
                   value={loop}
@@ -655,7 +660,7 @@ export default function AddSoundModal() {
                   </label>
                   <input
                     type="range" min="0" max="60" step="1"
-                    value={cooldown} onChange={(e) => setCooldown(parseInt(e.target.value))}
+                    value={cooldown} onChange={(e) => setCooldown(Number.parseInt(e.target.value, 10))}
                     className="w-full volume-slider"
                   />
                   <p className="text-[10px] font-mono mt-1" style={{ color: '#3c4238' }}>

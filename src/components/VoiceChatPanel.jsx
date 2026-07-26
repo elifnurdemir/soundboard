@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import useVoiceChatStore from '../store/useVoiceChatStore';
 import useSoundStore from '../store/useSoundStore';
 import { VoiceChatRouter } from '../audio/VoiceChatRouter';
+import ProGate from './ProGate';
 
 export default function VoiceChatPanel() {
   const { closeVoiceChat } = useSoundStore();
@@ -159,24 +160,26 @@ export default function VoiceChatPanel() {
             </p>
 
             {window.electronAPI && (
-              <div className="pt-2 border-t border-app-border space-y-2">
-                <button
-                  onClick={handleInstallVirtualCable}
-                  disabled={installing}
-                  className="w-full py-2 text-[10px] font-bold font-mono tracking-wider bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] disabled:opacity-50 transition-colors"
-                  style={{ color: 'var(--accent)' }}
-                >
-                  {installing ? 'KURULUYOR...' : '⚡ OTOMATİK KUR'}
-                </button>
-                <p className="text-[9px] font-mono" style={{ color: '#3c4238' }}>
-                  VB-CABLE, VB-Audio'nun donationware ürünüdür — vb-cable.com. Kurulum sırasında bir Windows güvenlik onayı çıkacak.
-                </p>
-                {installMessage && (
-                  <p className="text-[10px] font-mono" style={{ color: installMessage.startsWith('Kurulum tamamlandı') ? '#00ff80' : '#ff6b6b' }}>
-                    {installMessage}
+              <ProGate feature="VB-CABLE otomatik kurulum">
+                <div className="pt-2 border-t border-app-border space-y-2">
+                  <button
+                    onClick={handleInstallVirtualCable}
+                    disabled={installing}
+                    className="w-full py-2 text-[10px] font-bold font-mono tracking-wider bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] disabled:opacity-50 transition-colors"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    {installing ? 'KURULUYOR...' : '⚡ OTOMATİK KUR'}
+                  </button>
+                  <p className="text-[9px] font-mono" style={{ color: '#3c4238' }}>
+                    VB-CABLE, VB-Audio'nun donationware ürünüdür — vb-cable.com. Kurulum sırasında bir Windows güvenlik onayı çıkacak.
                   </p>
-                )}
-              </div>
+                  {installMessage && (
+                    <p className="text-[10px] font-mono" style={{ color: installMessage.startsWith('Kurulum tamamlandı') ? '#00ff80' : '#ff6b6b' }}>
+                      {installMessage}
+                    </p>
+                  )}
+                </div>
+              </ProGate>
             )}
           </div>
 
@@ -230,6 +233,7 @@ export default function VoiceChatPanel() {
 
           {/* Per-app output routing (Chrome/Spotify → CABLE) */}
           {window.electronAPI && (
+            <ProGate feature="Uygulama sesini yönlendirme">
             <div className="p-3 bg-app-surface border border-app-border space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-bold text-white">Uygulama Sesini Yönlendir</p>
@@ -293,6 +297,7 @@ export default function VoiceChatPanel() {
                 Discord/Teams/Zoom/Skype/Slack burada görünmez — sesin geri yankılanmasını önlemek için. Ses yönlendirme svcl (NirSoft.net) ile yapılır.
               </p>
             </div>
+            </ProGate>
           )}
 
           {/* Mic passthrough */}

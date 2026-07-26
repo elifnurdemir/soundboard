@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', () => cb()),
 
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  activateLicense: (key) => ipcRenderer.invoke('activate-license', key),
+  getLicenseStatus: () => ipcRenderer.invoke('get-license-status'),
+  deactivateLicense: () => ipcRenderer.invoke('deactivate-license'),
+  openCheckout: () => ipcRenderer.invoke('open-checkout'),
   downloadYoutubeAudio: (url) => ipcRenderer.invoke('download-youtube-audio', url),
   onYoutubeProgress: (cb) => ipcRenderer.on('youtube-download-progress', (_, pct) => cb(pct)),
   offYoutubeProgress: () => ipcRenderer.removeAllListeners('youtube-download-progress'),
