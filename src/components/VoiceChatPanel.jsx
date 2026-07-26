@@ -159,7 +159,7 @@ export default function VoiceChatPanel() {
               ✓ Discord · OBS · Zoom · Teams · ses kayıt yazılımları
             </p>
 
-            {window.electronAPI && (
+            {window.electronAPI && window.electronAPI.platform === 'win32' && (
               <ProGate feature="VB-CABLE otomatik kurulum">
                 <div className="pt-2 border-t border-app-border space-y-2">
                   <button
@@ -232,7 +232,7 @@ export default function VoiceChatPanel() {
           </div>
 
           {/* Per-app output routing (Chrome/Spotify → CABLE) */}
-          {window.electronAPI && (
+          {window.electronAPI && window.electronAPI.platform === 'win32' && (
             <ProGate feature="Uygulama sesini yönlendirme">
             <div className="p-3 bg-app-surface border border-app-border space-y-2">
               <div className="flex items-center justify-between">

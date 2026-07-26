@@ -167,6 +167,7 @@ function createICO(sizes, drawFn) {
 const icoSizes = [16, 32, 48, 64, 128, 256];
 const ico = createICO(icoSizes, drawIcon);
 const png256 = createPNG(256, drawIcon);
+const png1024 = createPNG(1024, drawIcon);
 
 const root = path.join(__dirname, '..');
 
@@ -174,6 +175,8 @@ const root = path.join(__dirname, '..');
 fs.mkdirSync(path.join(root, 'build-assets'), { recursive: true });
 fs.writeFileSync(path.join(root, 'build-assets', 'icon.png'), png256);
 fs.writeFileSync(path.join(root, 'build-assets', 'icon.ico'), ico);
+// 1024x1024 source — electron-builder auto-generates .icns (mac) / icon sets (linux) from this.
+fs.writeFileSync(path.join(root, 'build-assets', 'icon-1024.png'), png1024);
 
 // electron/ — bundled in asar, used by main.js at runtime
 fs.writeFileSync(path.join(root, 'electron', 'icon.ico'), ico);

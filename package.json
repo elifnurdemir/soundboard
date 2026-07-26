@@ -2,6 +2,10 @@
   "name": "soundboard",
   "version": "1.0.21",
   "description": "Soundboard Desktop Application",
+  "author": {
+    "name": "Mert Metin",
+    "email": "mert@syncrosale.com"
+  },
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"npx vite\" \"wait-on tcp:5173 && node electron/launcher.js\"",
@@ -11,6 +15,8 @@
     "preview": "vite preview",
     "dist": "vite build && electron-builder --win --x64",
     "dist:dir": "vite build && electron-builder --win --x64 --dir",
+    "dist:mac": "vite build && electron-builder --mac",
+    "dist:linux": "vite build && electron-builder --linux",
     "icon": "node scripts/generate-icon.js",
     "postinstall": "node scripts/download-ytdlp.js && node scripts/download-vbcable.js && node scripts/download-svcl.js",
     "clean-release": "node scripts/clean-release.js",
@@ -30,12 +36,6 @@
       "!electron/bin/**",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "electron/bin",
-        "to": "bin"
-      }
-    ],
     "forceCodeSigning": false,
     "npmRebuild": false,
     "publish": {
@@ -54,6 +54,12 @@
             "x64"
           ]
         }
+      ],
+      "extraResources": [
+        {
+          "from": "electron/bin",
+          "to": "bin"
+        }
       ]
     },
     "nsis": {
@@ -63,6 +69,24 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Soundboard",
       "include": "build-assets/installer.nsh"
+    },
+    "mac": {
+      "icon": "build-assets/icon-1024.png",
+      "identity": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ]
+    },
+    "linux": {
+      "icon": "build-assets/icon-1024.png",
+      "category": "Utility",
+      "target": [
+        { "target": "AppImage" },
+        { "target": "deb" }
+      ]
     }
   },
   "dependencies": {

@@ -439,7 +439,7 @@ export default function AddSoundModal() {
                             onChange={(e) => { setYoutubeUrl(e.target.value); setDownloadError(''); }}
                             placeholder="YouTube linki yapıştır..."
                             disabled={downloading}
-                            className="flex-1 bg-app-input border border-app-border px-3 py-2 text-sm text-white outline-none focus-lime font-mono placeholder-[#3c4238] disabled:opacity-50"
+                            className="flex-1 min-w-0 bg-app-input border border-app-border px-3 py-2 text-sm text-white outline-none focus-lime font-mono placeholder-[#3c4238] disabled:opacity-50"
                           />
                           <button
                             type="button" onClick={handleYoutubeDownload}

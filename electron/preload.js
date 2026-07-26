@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  platform: process.platform,
   // Data persistence
   getData: () => ipcRenderer.invoke('get-data'),
   saveData: (data) => ipcRenderer.invoke('save-data', data),
@@ -33,6 +34,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLicenseStatus: () => ipcRenderer.invoke('get-license-status'),
   deactivateLicense: () => ipcRenderer.invoke('deactivate-license'),
   openCheckout: () => ipcRenderer.invoke('open-checkout'),
+  reportRendererError: (message, stack) => ipcRenderer.invoke('report-renderer-error', message, stack),
   downloadYoutubeAudio: (url) => ipcRenderer.invoke('download-youtube-audio', url),
   onYoutubeProgress: (cb) => ipcRenderer.on('youtube-download-progress', (_, pct) => cb(pct)),
   offYoutubeProgress: () => ipcRenderer.removeAllListeners('youtube-download-progress'),

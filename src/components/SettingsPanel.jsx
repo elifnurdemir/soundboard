@@ -136,7 +136,7 @@ function LicenseSection() {
               value={key}
               onChange={(e) => setKey(e.target.value)}
               placeholder="Lisans anahtarını yapıştır..."
-              className="flex-1 bg-app-input border border-app-border px-3 py-2 text-sm text-white outline-none focus-lime font-mono placeholder-[#3c4238]"
+              className="flex-1 min-w-0 bg-app-input border border-app-border px-3 py-2 text-sm text-white outline-none focus-lime font-mono placeholder-[#3c4238]"
             />
             <button
               onClick={handleActivate}
@@ -456,10 +456,10 @@ export default function SettingsPanel() {
                 SOUNDBOARD
               </p>
               <p className="text-[10px] font-mono text-[#5c665a]">
-                {appVersion ? `v${appVersion}` : 'v—'} · ELECTRON + REACT
+                {appVersion ? `v${appVersion}` : 'v—'}
               </p>
               <p className="text-[10px] font-mono text-[#3c4238]">
-                VB-AUDIO · OBS · TWITCH
+                OBS · TWITCH
               </p>
             </div>
           </Section>

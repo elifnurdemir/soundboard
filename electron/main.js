@@ -158,7 +158,16 @@ app.whenReady().then(() => {
 
   createWindow();
   createTray();
-  uIOhook.start();
+  try {
+    uIOhook.start();
+  } catch (err) {
+    // Known to throw/crash on macOS without Accessibility permission granted —
+    // global keyboard shortcuts just won't fire rather than taking the app down with it.
+    console.error('Global shortcuts unavailable (uIOhook failed to start):', err.message);
+    if (process.platform === 'darwin') {
+      console.error('On macOS, grant this app Accessibility access in System Settings > Privacy & Security > Accessibility, then restart.');
+    }
+  }
   // Clean up any app still silently routed to CABLE from a previous session (crash, force-kill, etc.),
   // then keep sweeping periodically to catch apps launched later that carry the same stale setting.
   const reportCleaned = (cleaned) => {
@@ -305,6 +314,46 @@ ipcMain.handle('deactivate-license', async () => {
 });
 
 ipcMain.handle('open-checkout', () => shell.openExternal(LEMONSQUEEZY_CHECKOUT_URL));
+
+// ─── Error reporting (Discord webhook) ───────────────────────────────────────
+// TODO: replace with a real Discord channel webhook URL (Channel Settings > Integrations > Webhooks).
+const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/YOUR-WEBHOOK-ID/YOUR-WEBHOOK-TOKEN';
+const reportedErrors = new Set(); // dedupe identical messages within one running session
+
+function reportErrorToDiscord(message, stack, context = 'main') {
+  if (!app.isPackaged) return; // never spam the channel from dev runs
+  if (DISCORD_WEBHOOK_URL.includes('YOUR-WEBHOOK-ID')) return; // placeholder never filled in
+
+  const dedupeKey = `${context}:${message}`;
+  if (reportedErrors.has(dedupeKey)) return;
+  reportedErrors.add(dedupeKey);
+
+  const trimmedStack = (stack || '').slice(0, 1900);
+  fetch(DISCORD_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      embeds: [{
+        title: `Soundboard hatası — ${context}`,
+        description: `\`\`\`${message}\n\n${trimmedStack}\`\`\``.slice(0, 4000),
+        color: 0xff4444,
+        fields: [
+          { name: 'Sürüm', value: app.getVersion(), inline: true },
+          { name: 'Platform', value: process.platform, inline: true },
+        ],
+        timestamp: new Date().toISOString(),
+      }],
+    }),
+  }).catch(() => { /* reporting itself must never crash the app */ });
+}
+
+process.on('uncaughtException', (err) => reportErrorToDiscord(err.message, err.stack, 'main:uncaughtException'));
+process.on('unhandledRejection', (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  reportErrorToDiscord(err.message, err.stack, 'main:unhandledRejection');
+});
+
+ipcMain.handle('report-renderer-error', (_, message, stack) => reportErrorToDiscord(message, stack, 'renderer'));
 
 // ─── File Dialog ───────────────────────────────────────────────────────────────
 ipcMain.handle('open-file-dialog', async () => {
