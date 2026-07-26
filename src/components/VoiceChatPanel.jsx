@@ -20,6 +20,8 @@ export default function VoiceChatPanel() {
   const [audioApps, setAudioApps] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [routingExe, setRoutingExe] = useState(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
 
   useEffect(() => {
     loadDevices();
@@ -65,6 +67,18 @@ export default function VoiceChatPanel() {
       else await routeApp(exe);
     } finally {
       setRoutingExe(null);
+    }
+  };
+
+  const handleResetAllRouting = async () => {
+    setResetting(true);
+    setResetMessage('');
+    try {
+      const res = await window.electronAPI.resetAllAppRouting();
+      setResetMessage(res.cleaned?.length ? `Sıfırlandı: ${res.cleaned.join(', ')}` : 'Sıfırlanacak bir şey bulunamadı — her şey zaten temiz.');
+      setAudioApps(null);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -219,15 +233,28 @@ export default function VoiceChatPanel() {
             <div className="p-3 bg-app-surface border border-app-border space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-bold text-white">Uygulama Sesini Yönlendir</p>
-                <button
-                  onClick={handleScanApps}
-                  disabled={scanning}
-                  className="text-[10px] font-bold font-mono tracking-wider disabled:opacity-50 transition-colors hover:text-white"
-                  style={{ color: 'var(--accent)' }}
-                >
-                  {scanning ? '...' : '🔍 BUL'}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleResetAllRouting}
+                    disabled={resetting}
+                    title="CABLE'a takılı kalmış her şeyi (önceki oturumlardan/çökmelerden dahi) geri al"
+                    className="text-[10px] font-bold font-mono tracking-wider disabled:opacity-50 transition-colors text-[#5c665a] hover:text-red-400"
+                  >
+                    {resetting ? '...' : '🧹 SIFIRLA'}
+                  </button>
+                  <button
+                    onClick={handleScanApps}
+                    disabled={scanning}
+                    className="text-[10px] font-bold font-mono tracking-wider disabled:opacity-50 transition-colors hover:text-white"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    {scanning ? '...' : '🔍 BUL'}
+                  </button>
+                </div>
               </div>
+              {resetMessage && (
+                <p className="text-[10px] font-mono" style={{ color: '#8e9c8b' }}>{resetMessage}</p>
+              )}
               <p className="text-xs font-mono" style={{ color: '#5c665a' }}>
                 Chrome (YouTube) veya Spotify gibi uygulamaların çıkışını doğrudan sanal kabloya yönlendirir.
               </p>

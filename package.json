@@ -1,6 +1,6 @@
 {
   "name": "soundboard",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "Soundboard Desktop Application",
   "main": "electron/main.js",
   "scripts": {

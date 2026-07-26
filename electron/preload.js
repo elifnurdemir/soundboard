@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listAudioSessions: () => ipcRenderer.invoke('list-audio-sessions'),
   routeAppToCable: (exeName) => ipcRenderer.invoke('route-app-to-cable', exeName),
   restoreAppDevice: (exeName, deviceId) => ipcRenderer.invoke('restore-app-device', exeName, deviceId),
+  resetAllAppRouting: () => ipcRenderer.invoke('reset-all-app-routing'),
   syncRoutedApps: (snapshot) => ipcRenderer.invoke('sync-routed-apps', snapshot),
   exportZip: (data) => ipcRenderer.invoke('export-zip', data),
   importZip: () => ipcRenderer.invoke('import-zip'),

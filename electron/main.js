@@ -158,6 +158,16 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   uIOhook.start();
+  // Clean up any app still silently routed to CABLE from a previous session (crash, force-kill, etc.),
+  // then keep sweeping periodically to catch apps launched later that carry the same stale setting.
+  const reportCleaned = (cleaned) => {
+    if (cleaned.length) console.log('Stray CABLE routing restored for:', cleaned.join(', '));
+  };
+  cleanupStaleCableRouting().then(reportCleaned);
+  setInterval(() => {
+    const excludeExes = new Set(Object.keys(routedAppsSnapshot).map((e) => e.toLowerCase()));
+    cleanupStaleCableRouting(excludeExes).then(reportCleaned);
+  }, 60000);
   // Check for updates 5 seconds after launch (only in packaged app)
   if (app.isPackaged) {
     setTimeout(() => autoUpdater.checkForUpdates(), 5000);
@@ -502,6 +512,11 @@ function findCableInputDeviceId(rows) {
   return row ? row['Command-Line Friendly ID'] : null;
 }
 
+function findCableInputItemId(rows) {
+  const row = rows.find((r) => r.Type === 'Device' && r.Direction === 'Render' && r.Name === 'CABLE Input');
+  return row ? row['Item ID'] : null;
+}
+
 // The system's current default output device (the "Default" column is only non-empty on
 // that one Device/Render row). Windows keeps a stale Application/Render row per device an
 // app has EVER played through, so per-app rows can't reliably tell us which one is live —
@@ -511,6 +526,49 @@ function findSystemDefaultRenderDeviceId(rows) {
   const row = rows.find((r) => r.Type === 'Device' && r.Direction === 'Render' && r.Default === 'Render');
   return row ? row['Command-Line Friendly ID'] : null;
 }
+
+// svcl's /SetAppDefault change is sticky at the Windows level — it survives Soundboard
+// closing, crashing, or being force-killed, so an app can stay silently routed to CABLE
+// from a *previous* session forever, and will keep using CABLE the next time it launches
+// even though nothing in the CURRENT session ever routed it.
+//
+// A one-time sweep at startup only catches apps that already have a live audio session at
+// that exact moment — it does NOT catch an app launched *after* startup that happens to still
+// carry a stale per-app default from before. So this also runs on a timer while Soundboard is
+// open. `excludeExes` lets the periodic sweep skip apps the user is intentionally routing
+// *right now* in this session — the manual "SIFIRLA" button passes no exclusions (resets everything).
+async function cleanupStaleCableRouting(excludeExes = new Set()) {
+  try {
+    if (!fs.existsSync(getSvclPath())) return [];
+    const rows = await runSvclExport();
+    const cableItemId = findCableInputItemId(rows);
+    const defaultId = findSystemDefaultRenderDeviceId(rows);
+    if (!cableItemId || !defaultId) return [];
+
+    const staleExes = new Set();
+    for (const row of rows) {
+      if (row.Type !== 'Application' || row.Direction !== 'Render') continue;
+      const guidPrefix = (row['Item ID'] || '').split('|')[0];
+      if (guidPrefix !== cableItemId) continue;
+      const exe = exeNameFromRow(row);
+      if (!exe) continue;
+      const exeLower = exe.toLowerCase();
+      if (VOICE_APP_BLOCKLIST.has(exeLower) || SYSTEM_NOISE_EXE.has(exeLower) || excludeExes.has(exeLower)) continue;
+      staleExes.add(exe);
+    }
+
+    const cleaned = [];
+    for (const exe of staleExes) {
+      try { await runSvclSetAppDefault(defaultId, exe); cleaned.push(exe); } catch (_) { /* best-effort */ }
+    }
+    return cleaned;
+  } catch (err) {
+    console.error('cleanupStaleCableRouting error:', err.message);
+    return [];
+  }
+}
+
+ipcMain.handle('reset-all-app-routing', async () => ({ success: true, cleaned: await cleanupStaleCableRouting() }));
 
 ipcMain.handle('list-audio-sessions', async () => {
   try {

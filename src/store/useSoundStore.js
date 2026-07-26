@@ -181,6 +181,7 @@ const useSoundStore = create((set, get) => ({
       fadeOut: data.fadeOut ?? 0,
       trimStart: data.trimStart ?? 0,
       trimEnd: data.trimEnd ?? null,
+      playbackRate: data.playbackRate ?? 1,
       favorite: data.favorite ?? false,
       playCount: data.playCount ?? 0,
       cooldown: data.cooldown ?? 0,
@@ -282,6 +283,8 @@ const useSoundStore = create((set, get) => ({
 
     const audio = new Audio(url);
     audio.loop = (sound.loop ?? false) && !hasTrim;
+    audio.playbackRate = sound.playbackRate ?? 1;
+    audio.preservesPitch = false; // let rate changes shift pitch too — chipmunk/deep-voice effect
 
     if ((sound.trimStart ?? 0) > 0) {
       audio.addEventListener('loadedmetadata', () => {
@@ -361,7 +364,7 @@ const useSoundStore = create((set, get) => ({
     // Voice chat: also play on virtual device
     let vcAudio = null;
     try {
-      vcAudio = await voiceChatRouter.playOnVirtualDevice(url, targetVol, sound.loop ?? false);
+      vcAudio = await voiceChatRouter.playOnVirtualDevice(url, targetVol, sound.loop ?? false, sound.playbackRate ?? 1);
     } catch (_) {}
 
     const instance = { audio, vcAudio, _fadingOut: false };

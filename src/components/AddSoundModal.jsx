@@ -131,6 +131,7 @@ export default function AddSoundModal() {
   const [fadeOut, setFadeOut] = useState(editingSound?.fadeOut ?? 0);
   const [trimStart, setTrimStart] = useState(editingSound?.trimStart ?? 0);
   const [trimEnd, setTrimEnd] = useState(editingSound?.trimEnd ?? null);
+  const [playbackRate, setPlaybackRate] = useState(editingSound?.playbackRate ?? 1);
   const [cooldown, setCooldown] = useState(editingSound?.cooldown ?? 0);
   const [overlap, setOverlap] = useState(editingSound?.overlap ?? true);
   const [chatCommand, setChatCommand] = useState(editingSound?.chatCommand || '');
@@ -328,7 +329,7 @@ export default function AddSoundModal() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!filePath && !isEditing) return;
-    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, trimStart, trimEnd, cooldown, overlap, chatCommand, image: imagePath || '', noColor: imagePath ? noColor : false };
+    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, trimStart, trimEnd, playbackRate, cooldown, overlap, chatCommand, image: imagePath || '', noColor: imagePath ? noColor : false };
     if (filePath) data.filePath = filePath;
     if (isEditing) updateSound(editingSound.id, data);
     else addSound({ ...data, filePath });
@@ -616,6 +617,21 @@ export default function AddSoundModal() {
                     value={fadeOut} onChange={(e) => setFadeOut(parseFloat(e.target.value))}
                     className="w-full volume-slider"
                   />
+                </div>
+
+                <div>
+                  <label className={labelCls} style={{ color: '#8e9c8b' }}>
+                    Hız / Perde —{' '}
+                    <span className="font-mono" style={{ color: 'var(--accent)' }}>{playbackRate === 1 ? 'NORMAL' : `${playbackRate.toFixed(2)}x`}</span>
+                  </label>
+                  <input
+                    type="range" min="0.5" max="2" step="0.05"
+                    value={playbackRate} onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
+                    className="w-full volume-slider"
+                  />
+                  <p className="text-[10px] font-mono mt-1" style={{ color: '#3c4238' }}>
+                    1x'ten düşük = kalın/yavaş ses, yüksek = ince/hızlı ses (sincap efekti)
+                  </p>
                 </div>
 
                 <Toggle

@@ -91,12 +91,14 @@ class VoiceChatRouter {
    * Play a sound URL on the virtual cable device.
    * Returns the Audio element so it can be tracked.
    */
-  async playOnVirtualDevice(url, volume, loop = false) {
+  async playOnVirtualDevice(url, volume, loop = false, playbackRate = 1) {
     if (!this.virtualDeviceId) return null;
 
     const audio = new Audio(url);
     audio.volume = Math.min(1, volume);
     audio.loop = loop;
+    audio.playbackRate = playbackRate;
+    audio.preservesPitch = false;
 
     try {
       await audio.setSinkId(this.virtualDeviceId);
