@@ -28,6 +28,7 @@ export default function App() {
     loadData, isLoaded, settings, sounds, playSound, stopSoundWithFade,
     stopAllInstancesOf, playingSounds,
     isAddModalOpen, isSettingsOpen, isVoiceChatOpen, isStreamOpen,
+    openAddModalWithFile,
   } = useSoundStore();
 
   const { onChatCommand } = useStreamStore();
@@ -38,6 +39,25 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme || 'dark';
   }, [settings.theme]);
+
+  // Global drag & drop — drop an audio/video file anywhere to open "Ses Ekle" with it preloaded.
+  // Skipped while a modal is already open — its own dropzone handles that case.
+  useEffect(() => {
+    const handleDragOver = (e) => e.preventDefault();
+    const handleDrop = (e) => {
+      e.preventDefault();
+      if (isAddModalOpen) return;
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      if (window.electronAPI && file.path) openAddModalWithFile(file.path);
+    };
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('drop', handleDrop);
+    return () => {
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, [isAddModalOpen, openAddModalWithFile]);
 
   // Global keyboard shortcuts — register with Electron for OS-wide hotkeys
   useEffect(() => {

@@ -238,26 +238,48 @@ export default function AddSoundModal() {
     recordStreamRef.current?.getTracks().forEach((t) => t.stop());
   }, []);
 
+  // Reused by the file dialog, drag & drop onto the modal, and drag & drop onto the main window.
+  const importFromPath = async (src) => {
+    const copyResult = await window.electronAPI.copyFile(src);
+    const fp = copyResult.success ? copyResult.destPath : src;
+    setFilePath(fp);
+    const fn = fp.split(/[\\/]/).pop();
+    setFileName(fn);
+    if (!name) setName(fn.replace(/\.[^.]+$/, ''));
+    setTrimStart(0);
+    setTrimEnd(null);
+  };
+
+  // Picked up via a global drop onto the main window (see App.jsx) before this modal opened.
+  useEffect(() => {
+    const pending = useSoundStore.getState().pendingImportPath;
+    if (pending) {
+      useSoundStore.setState({ pendingImportPath: null });
+      importFromPath(pending);
+    }
+  }, []);
+
+  const handleModalDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
+  const handleModalDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    if (window.electronAPI && file.path) importFromPath(file.path);
+  };
+
   const handleFileSelect = async () => {
     if (window.electronAPI) {
       // Electron: native dosya diyalogu
       const result = await window.electronAPI.openFileDialog();
       if (!result.canceled && result.filePaths.length > 0) {
-        const src = result.filePaths[0];
-        const copyResult = await window.electronAPI.copyFile(src);
-        const fp = copyResult.success ? copyResult.destPath : src;
-        setFilePath(fp);
-        const fn = fp.split(/[\\/]/).pop();
-        setFileName(fn);
-        if (!name) setName(fn.replace(/\.[^.]+$/, ''));
-        setTrimStart(0);
-        setTrimEnd(null);
+        await importFromPath(result.filePaths[0]);
       }
     } else {
       // Tarayıcı: standart file input
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'audio/*,.mp3,.wav,.ogg,.flac,.m4a,.aac';
+      input.accept = 'audio/*,video/mp4,video/webm,.mp3,.wav,.ogg,.flac,.m4a,.aac,.mp4,.webm,.mov';
       input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -333,6 +355,8 @@ export default function AddSoundModal() {
       <div
         className="bracket-4 bg-app-surface w-full max-w-lg mx-4 border border-app-border shadow-2xl fade-in overflow-hidden"
         onClick={(e) => e.stopPropagation()}
+        onDragOver={handleModalDragOver}
+        onDrop={handleModalDrop}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-app-border">
@@ -382,7 +406,7 @@ export default function AddSoundModal() {
                     <div className="flex-1 min-w-0">
                       {fileName
                         ? <p className="text-white text-sm font-mono truncate">{fileName}</p>
-                        : <p className="text-sm font-mono" style={{ color: '#5c665a' }}>MP3, WAV, OGG seç...</p>
+                        : <p className="text-sm font-mono" style={{ color: '#5c665a' }}>MP3, WAV, MP4... seç ya da sürükle-bırak</p>
                       }
                     </div>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5c665a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

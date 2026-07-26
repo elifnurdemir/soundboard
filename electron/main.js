@@ -209,7 +209,7 @@ ipcMain.handle('open-file-dialog', async () => {
   return dialog.showOpenDialog(mainWindow, {
     properties: ['openFile', 'multiSelections'],
     filters: [
-      { name: 'Ses Dosyaları', extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'] },
+      { name: 'Ses/Video Dosyaları', extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'mp4', 'webm', 'mov'] },
       { name: 'Tüm Dosyalar', extensions: ['*'] },
     ],
   });
@@ -257,7 +257,7 @@ ipcMain.handle('open-folder-dialog', async () => {
 });
 
 ipcMain.handle('list-audio-files', async (_, folderPath) => {
-  const AUDIO_EXT = new Set(['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac']);
+  const AUDIO_EXT = new Set(['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac', '.mp4', '.webm', '.mov']);
   try {
     const entries = fs.readdirSync(folderPath, { withFileTypes: true });
     return entries

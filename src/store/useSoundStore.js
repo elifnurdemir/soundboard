@@ -109,6 +109,7 @@ const useSoundStore = create((set, get) => ({
   isVoiceChatOpen: false,
   isStreamOpen: false,
   editingSound: null,
+  pendingImportPath: null,
   isLoaded: false,
 
   // ─── Data ────────────────────────────────────────────────────────────────
@@ -463,7 +464,8 @@ const useSoundStore = create((set, get) => ({
   openSettings: () => set({ isSettingsOpen: true }),
   closeSettings: () => set({ isSettingsOpen: false }),
   openAddModal: (sound = null) => set({ isAddModalOpen: true, editingSound: sound }),
-  closeAddModal: () => set({ isAddModalOpen: false, editingSound: null }),
+  openAddModalWithFile: (filePath) => set({ isAddModalOpen: true, editingSound: null, pendingImportPath: filePath }),
+  closeAddModal: () => set({ isAddModalOpen: false, editingSound: null, pendingImportPath: null }),
   openVoiceChat: () => set({ isVoiceChatOpen: true }),
   closeVoiceChat: () => set({ isVoiceChatOpen: false }),
   openStream: () => set({ isStreamOpen: true }),
