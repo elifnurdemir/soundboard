@@ -3,3 +3,20 @@ release
 dist
 *.log
 electron/bin/
+
+# build çıktıları (release ve geçici release-new vb.)
+release-*/
+
+# yerel hata ayıklama günlükleri
+test-log.txt
+
+# gizli bilgiler (GH_TOKEN vb.) asla commit'lenmesin
+.env
+.env.*
+
+# işletim sistemi dosyaları
+.DS_Store
+Thumbs.db
+
+# graphify çıktısı
+graphify-out/

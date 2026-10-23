@@ -100,7 +100,7 @@ export default function SoundGrid() {
     }
   }, [reorderSounds]);
 
-  const cols = settings.gridColumns || 5;
+  const cols = Math.min(20, Math.max(1, settings.gridColumns || 5));
 
   if (viewMode === 'keyboard') {
     return (

@@ -2,6 +2,9 @@ import { useEffect, useRef } from 'react';
 import useSoundStore from './store/useSoundStore';
 import useStreamStore from './store/useStreamStore';
 import useLicenseStore from './store/useLicenseStore';
+import useRoomStore from './store/useRoomStore';
+import useCollageStore from './store/useCollageStore';
+import CollageStudio from './components/CollageStudio';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import SoundGrid from './components/SoundGrid';
@@ -11,6 +14,8 @@ import VoiceChatPanel from './components/VoiceChatPanel';
 import StreamPanel from './components/StreamPanel';
 import UpdateBanner from './components/UpdateBanner';
 import SoundQueue from './components/SoundQueue';
+
+const AUDIO_VIDEO_RE = /\.(mp3|wav|ogg|flac|m4a|aac|opus|wma|mp4|webm|mkv|mov|avi|m4v)$/i;
 
 function matchesShortcut(event, shortcut) {
   if (!shortcut) return false;
@@ -33,11 +38,21 @@ export default function App() {
   } = useSoundStore();
 
   const { onChatCommand } = useStreamStore();
+  const isCollageOpen = useCollageStore((s) => s.isOpen);
   const licenseStatus = useLicenseStore((s) => s.status);
   const unsubRef = useRef(null);
 
   useEffect(() => { loadData(); }, []);
   useEffect(() => { useLicenseStore.getState().checkStatus(); }, []);
+
+  // Ortak oda: arkadaşların istekleri (oda main process'te çalışıyor)
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    useRoomStore.getState().refresh();
+    window.electronAPI.offRoomPlay();
+    window.electronAPI.onRoomPlay((p) => useRoomStore.getState().handlePlay(p));
+    return () => window.electronAPI.offRoomPlay();
+  }, []);
 
   // Premium themes only actually apply for Pro — even if a tampered-with settings file
   // claims one, we fall back to the free default rather than trusting the client state.
@@ -56,7 +71,7 @@ export default function App() {
       e.preventDefault();
       if (isAddModalOpen) return;
       const file = e.dataTransfer?.files?.[0];
-      if (!file) return;
+      if (!file || !AUDIO_VIDEO_RE.test(file.name)) return; // görseller butonlara bırakılır
       if (window.electronAPI && file.path) openAddModalWithFile(file.path);
     };
     window.addEventListener('dragover', handleDragOver);
@@ -139,6 +154,7 @@ export default function App() {
       {isSettingsOpen && <SettingsPanel />}
       {isVoiceChatOpen && <VoiceChatPanel />}
       {isStreamOpen && <StreamPanel />}
+      {isCollageOpen && <CollageStudio />}
       <UpdateBanner />
       <SoundQueue />
     </div>

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { voiceChatRouter } from '../audio/VoiceChatRouter';
+import { audioEngine } from '../audio/AudioEngine';
 import useLicenseStore from './useLicenseStore';
 
 export const PRESET_COLORS = [
@@ -68,30 +69,6 @@ function buildAudioUrl(filePath) {
   return /^[A-Za-z]:/.test(n) ? `file:///${n}` : `file://${n}`;
 }
 
-// Smooth volume ramp (fade in/out)
-function rampVolume(audio, fromVol, toVol, durationMs, onDone) {
-  if (durationMs <= 0) {
-    audio.volume = Math.min(1, toVol);
-    onDone?.();
-    return;
-  }
-  const steps = Math.ceil(durationMs / 16); // ~60fps
-  const delta = (toVol - fromVol) / steps;
-  let step = 0;
-  audio.volume = Math.min(1, Math.max(0, fromVol));
-  const id = setInterval(() => {
-    step++;
-    const v = fromVol + delta * step;
-    audio.volume = Math.min(1, Math.max(0, v));
-    if (step >= steps) {
-      audio.volume = Math.min(1, Math.max(0, toVol));
-      clearInterval(id);
-      onDone?.();
-    }
-  }, 16);
-  return id;
-}
-
 const useSoundStore = create((set, get) => ({
   // ─── State ──────────────────────────────────────────────────────────────
   categories: DEFAULT_CATEGORIES,
@@ -99,7 +76,7 @@ const useSoundStore = create((set, get) => ({
   settings: { ...DEFAULT_SETTINGS },
   activeCategory: 'all',
   searchQuery: '',
-  // { [soundId]: [ { audio, vcAudio, fadeIntervalId } ] }  — supports overlap
+  // { [soundId]: [ { voice } ] }  — supports overlap (voice = AudioEngine Voice)
   playingSounds: {},
   // cooldown tracking { [soundId]: lastPlayedTimestamp }
   cooldownTracker: {},
@@ -183,6 +160,9 @@ const useSoundStore = create((set, get) => ({
       trimStart: data.trimStart ?? 0,
       trimEnd: data.trimEnd ?? null,
       playbackRate: data.playbackRate ?? 1,
+      bass: data.bass ?? 0,
+      treble: data.treble ?? 0,
+      reverb: data.reverb ?? 0,
       favorite: data.favorite ?? false,
       playCount: data.playCount ?? 0,
       cooldown: data.cooldown ?? 0,
@@ -280,104 +260,51 @@ const useSoundStore = create((set, get) => ({
 
     const url = buildAudioUrl(sound.filePath);
     const targetVol = Math.min(1, (sound.volume ?? 0.8) * (settings.globalVolume ?? 1));
-    const hasTrim = (sound.trimStart ?? 0) > 0 || sound.trimEnd != null;
 
-    // Pro-only effect — only applied for licensed users, even if a stale/tampered-with
-    // sound record on disk carries a non-default rate (defense in depth, not just hiding the UI).
-    const effectiveRate = useLicenseStore.getState().isPro() ? (sound.playbackRate ?? 1) : 1;
+    // Pro-only effects — only applied for licensed users, even if a stale/tampered-with
+    // sound record on disk carries non-default values (defense in depth, not just hiding the UI).
+    const isPro = useLicenseStore.getState().isPro();
+    const effectiveRate = isPro ? (sound.playbackRate ?? 1) : 1; // rate also shifts pitch
+    const fx = isPro
+      ? { bass: sound.bass ?? 0, treble: sound.treble ?? 0, reverb: sound.reverb ?? 0 }
+      : { bass: 0, treble: 0, reverb: 0 };
 
-    const audio = new Audio(url);
-    audio.loop = (sound.loop ?? false) && !hasTrim;
-    audio.playbackRate = effectiveRate;
-    audio.preservesPitch = false; // let rate changes shift pitch too — chipmunk/deep-voice effect
-
-    if ((sound.trimStart ?? 0) > 0) {
-      audio.addEventListener('loadedmetadata', () => {
-        audio.currentTime = sound.trimStart;
-      }, { once: true });
-    }
-
-    // Fade in
-    if (sound.fadeIn > 0) {
-      audio.volume = 0;
-      audio.addEventListener('canplay', () => {
-        rampVolume(audio, 0, targetVol, (sound.fadeIn ?? 0) * 1000);
-      }, { once: true });
-    } else {
-      audio.volume = targetVol;
-    }
-
-    // Cleanup on end — then play next from queue
-    const cleanup = () => {
+    let voice;
+    const removeInstance = () => {
       set((state) => {
-        const instances = (state.playingSounds[sound.id] || []).filter((inst) => inst.audio !== audio);
+        const instances = (state.playingSounds[sound.id] || []).filter((inst) => inst.voice !== voice);
         const next = { ...state.playingSounds };
         if (instances.length === 0) delete next[sound.id];
         else next[sound.id] = instances;
         return { playingSounds: next };
       });
-      get()._playNextFromQueue();
     };
 
-    let stopped = false;
-    const stopAndCleanup = () => {
-      if (stopped) return;
-      stopped = true;
-      audio.pause();
-      cleanup();
-    };
-
-    if (!sound.loop) {
-      audio.addEventListener('ended', stopAndCleanup);
-    }
-    audio.addEventListener('error', cleanup);
-
-    // Trim end / loop-within-trim / fade-out — driven off currentTime vs. trim end
-    audio.addEventListener('timeupdate', () => {
-      const end = sound.trimEnd != null ? sound.trimEnd : audio.duration;
-      if (!end || Number.isNaN(end)) return;
-
-      if (sound.loop) {
-        if (hasTrim && audio.currentTime >= end) {
-          audio.currentTime = sound.trimStart || 0;
-        }
-        return;
-      }
-
-      if (sound.fadeOut > 0) {
-        const remaining = end - audio.currentTime;
-        if (remaining > 0 && remaining <= (sound.fadeOut ?? 0) && audio.volume > 0) {
-          const instances = get().playingSounds[sound.id] || [];
-          const inst = instances.find((i) => i.audio === audio);
-          if (inst && !inst._fadingOut) {
-            inst._fadingOut = true;
-            rampVolume(audio, audio.volume, 0, remaining * 1000);
-          }
-        }
-      }
-
-      if (audio.currentTime >= end) {
-        stopAndCleanup();
-      }
-    });
-
-    audio.play().catch((e) => {
-      console.error(`Play "${sound.name}":`, e.message);
-      cleanup();
-    });
-
-    // Voice chat: also play on virtual device
-    let vcAudio = null;
     try {
-      vcAudio = await voiceChatRouter.playOnVirtualDevice(url, targetVol, sound.loop ?? false, effectiveRate);
-    } catch (_) { /* virtual cable optional — regular playback above already started */ }
-
-    const instance = { audio, vcAudio, _fadingOut: false };
+      voice = await audioEngine.play(url, {
+        volume: targetVol,
+        loop: sound.loop ?? false,
+        rate: effectiveRate,
+        trimStart: sound.trimStart ?? 0,
+        trimEnd: sound.trimEnd ?? null,
+        fadeIn: sound.fadeIn ?? 0,
+        fadeOut: sound.fadeOut ?? 0,
+        ...fx,
+        onEnded: () => {
+          removeInstance();
+          get()._playNextFromQueue();
+        },
+      });
+    } catch (e) {
+      console.error(`Play "${sound.name}":`, e.message);
+      get()._playNextFromQueue();
+      return;
+    }
 
     set((state) => ({
       playingSounds: {
         ...state.playingSounds,
-        [sound.id]: [...(state.playingSounds[sound.id] || []), instance],
+        [sound.id]: [...(state.playingSounds[sound.id] || []), { voice }],
       },
       cooldownTracker: { ...state.cooldownTracker, [sound.id]: now },
       sounds: state.sounds.map((s) => (s.id === sound.id ? { ...s, playCount: (s.playCount || 0) + 1 } : s)),
@@ -386,13 +313,8 @@ const useSoundStore = create((set, get) => ({
   },
 
   stopAllInstancesOf: (soundId) => {
-    const { playingSounds } = get();
-    const instances = playingSounds[soundId] || [];
-    instances.forEach(({ audio, vcAudio }) => {
-      audio.pause();
-      audio.src = '';
-      if (vcAudio) { vcAudio.pause(); vcAudio.src = ''; }
-    });
+    const instances = get().playingSounds[soundId] || [];
+    instances.forEach(({ voice }) => voice.stop());
     set((state) => {
       const next = { ...state.playingSounds };
       delete next[soundId];
@@ -405,18 +327,7 @@ const useSoundStore = create((set, get) => ({
     const instances = playingSounds[soundId] || [];
     const fadeOut = sound?.fadeOut ?? 0;
 
-    instances.forEach(({ audio, vcAudio }) => {
-      if (fadeOut > 0) {
-        rampVolume(audio, audio.volume, 0, fadeOut * 1000, () => {
-          audio.pause(); audio.src = '';
-          if (vcAudio) { vcAudio.pause(); vcAudio.src = ''; }
-        });
-        if (vcAudio) rampVolume(vcAudio, vcAudio.volume, 0, fadeOut * 1000);
-      } else {
-        audio.pause(); audio.src = '';
-        if (vcAudio) { vcAudio.pause(); vcAudio.src = ''; }
-      }
-    });
+    instances.forEach(({ voice }) => voice.fadeOutAndStop(fadeOut));
 
     if (fadeOut <= 0) {
       set((state) => {
@@ -437,10 +348,7 @@ const useSoundStore = create((set, get) => ({
 
   stopAllSounds: () => {
     const { playingSounds } = get();
-    Object.values(playingSounds).flat().forEach(({ audio, vcAudio }) => {
-      audio.pause(); audio.src = '';
-      if (vcAudio) { vcAudio.pause(); vcAudio.src = ''; }
-    });
+    Object.values(playingSounds).flat().forEach(({ voice }) => voice.stop());
     set({ playingSounds: {}, soundQueue: [] });
   },
 
@@ -465,7 +373,7 @@ const useSoundStore = create((set, get) => ({
     const { playingSounds, settings } = get();
     const instances = playingSounds[soundId] || [];
     const v = Math.min(1, volume * (settings.globalVolume ?? 1));
-    instances.forEach(({ audio }) => { audio.volume = v; });
+    instances.forEach(({ voice }) => voice.setVolume(v));
   },
 
   // ─── UI State ────────────────────────────────────────────────────────────
@@ -487,8 +395,8 @@ const useSoundStore = create((set, get) => ({
       const { playingSounds, sounds } = get();
       sounds.forEach((s) => {
         const instances = playingSounds[s.id] || [];
-        instances.forEach(({ audio }) => {
-          audio.volume = Math.min(1, (s.volume ?? 0.8) * updates.globalVolume);
+        instances.forEach(({ voice }) => {
+          voice.setVolume(Math.min(1, (s.volume ?? 0.8) * updates.globalVolume));
         });
       });
     }

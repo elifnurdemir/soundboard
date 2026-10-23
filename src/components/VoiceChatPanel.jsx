@@ -3,6 +3,8 @@ import useVoiceChatStore from '../store/useVoiceChatStore';
 import useSoundStore from '../store/useSoundStore';
 import { VoiceChatRouter } from '../audio/VoiceChatRouter';
 import ProGate from './ProGate';
+import useRoomStore from '../store/useRoomStore';
+import { VOICE_PRESETS } from '../audio/VoiceChanger';
 
 export default function VoiceChatPanel() {
   const { closeVoiceChat } = useSoundStore();
@@ -12,8 +14,11 @@ export default function VoiceChatPanel() {
     micPassthrough, setMicPassthrough,
     outputDevices, loadDevices,
     routedApps, routeApp, unrouteApp,
+    voicePreset, voiceFx, setVoiceFx,
     error,
   } = useVoiceChatStore();
+  const room = useRoomStore();
+  const [copied, setCopied] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -26,6 +31,7 @@ export default function VoiceChatPanel() {
 
   useEffect(() => {
     loadDevices();
+    useRoomStore.getState().refresh();
     // Restore saved device into store state
     const savedId = useSoundStore.getState().settings.voiceDeviceId;
     if (savedId && !virtualDeviceId) {
@@ -320,6 +326,105 @@ export default function VoiceChatPanel() {
                 <span className="relative rounded-full h-2 w-2 bg-green-400"/>
               </span>
               <p className="text-xs font-mono text-green-400">MİKROFON AKTİF — sanal kabloya iletiliyor</p>
+            </div>
+          )}
+
+          {/* Voice changer */}
+          <ProGate feature="Ses değiştirici">
+            <div className="p-3 bg-app-surface border border-app-border space-y-3">
+              <div>
+                <p className="text-sm font-bold text-white">Ses Değiştirici</p>
+                <p className="text-xs font-mono mt-0.5" style={{ color: '#5c665a' }}>
+                  {micPassthrough ? 'Mikrofonun arkadaşlarına bu efektle gider' : 'Efekt için yukarıdan Mikrofon Geçişi açık olmalı'}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {VOICE_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setVoiceFx({ pitch: p.pitch, robot: p.robot, echo: p.echo }, p.id)}
+                    className="px-2.5 py-1 text-[10px] font-bold font-mono tracking-wider border transition-colors"
+                    style={voicePreset === p.id
+                      ? { borderColor: 'var(--accent-border)', color: 'var(--accent)', background: 'var(--accent-dim)' }
+                      : { borderColor: '#1e231e', color: '#8e9c8b', background: '#0b0d0b' }}
+                  >
+                    {p.label.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-[0.1em] font-mono mb-1" style={{ color: '#8e9c8b' }}>
+                  Perde — <span style={{ color: 'var(--accent)' }}>{voiceFx.pitch === 0 ? 'NORMAL' : `${voiceFx.pitch > 0 ? '+' : ''}${voiceFx.pitch} yarım ton`}</span>
+                </label>
+                <input type="range" min="-12" max="12" step="1" value={voiceFx.pitch}
+                  onChange={(e) => setVoiceFx({ pitch: Number.parseInt(e.target.value, 10) })}
+                  className="w-full volume-slider" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-[0.1em] font-mono mb-1" style={{ color: '#8e9c8b' }}>
+                  Yankı — <span style={{ color: 'var(--accent)' }}>{voiceFx.echo === 0 ? 'KAPALI' : `${Math.round(voiceFx.echo * 100)}%`}</span>
+                </label>
+                <input type="range" min="0" max="1" step="0.05" value={voiceFx.echo}
+                  onChange={(e) => setVoiceFx({ echo: Number.parseFloat(e.target.value) })}
+                  className="w-full volume-slider" />
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-mono text-white">Robot</p>
+                <Toggle value={voiceFx.robot} onChange={() => setVoiceFx({ robot: !voiceFx.robot })} />
+              </div>
+            </div>
+          </ProGate>
+
+          {/* Shared room */}
+          {window.electronAPI && (
+            <div className="p-3 bg-app-surface border border-app-border space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-white">Ortak Oda</p>
+                  <p className="text-xs font-mono mt-0.5" style={{ color: '#5c665a' }}>Arkadaşların linkten senin soundboard'unu tetikler</p>
+                </div>
+                <Toggle value={room.running} onChange={() => (room.running ? room.stop() : room.start())} />
+              </div>
+
+              {room.error && <p className="text-[10px] font-mono text-red-400">{room.error}</p>}
+
+              {room.running && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-mono" style={{ color: '#8e9c8b' }}>
+                    Oda kodu: <span className="font-bold" style={{ color: 'var(--accent)' }}>{room.token}</span> · port {room.port}
+                  </p>
+                  {room.urls.length === 0 && (
+                    <p className="text-[10px] font-mono" style={{ color: '#5c665a' }}>Ağ adresi bulunamadı — internete bağlı mısın?</p>
+                  )}
+                  {room.urls.map((u) => (
+                    <div key={u} className="flex items-center gap-2 p-2 bg-app-input border border-app-border">
+                      <span className="text-[10px] font-mono text-white truncate flex-1">{u}</span>
+                      <button
+                        onClick={() => { navigator.clipboard?.writeText(u); setCopied(u); setTimeout(() => setCopied(''), 1500); }}
+                        className="shrink-0 text-[10px] font-bold font-mono"
+                        style={{ color: 'var(--accent)' }}
+                      >
+                        {copied === u ? 'KOPYALANDI' : 'KOPYALA'}
+                      </button>
+                    </div>
+                  ))}
+                  <p className="text-[9px] font-mono" style={{ color: '#3c4238' }}>
+                    Aynı ağdaki biri bu linki açabilir. İnternetten bağlanmaları için router'da {room.port} portunu yönlendir ya da Tailscale/ZeroTier kullan.
+                    Linki sadece güvendiklerine ver; odayı kapatınca kod geçersiz olur.
+                  </p>
+
+                  {room.activity.length > 0 && (
+                    <div className="space-y-1 pt-2 border-t border-app-border">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] font-mono" style={{ color: '#5c665a' }}>SON HAREKETLER</p>
+                      {room.activity.slice(0, 6).map((a) => (
+                        <p key={a.id} className="text-[10px] font-mono truncate" style={{ color: '#8e9c8b' }}>
+                          <span style={{ color: 'var(--accent)' }}>{a.who}</span> → {a.soundName}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

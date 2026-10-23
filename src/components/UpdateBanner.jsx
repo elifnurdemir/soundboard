@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 export default function UpdateBanner() {
-  const [state, setState] = useState('idle'); // idle | available | downloading | ready
+  const [state, setState] = useState('idle'); // idle | downloading | ready
   const [version, setVersion] = useState('');
   const [progress, setProgress] = useState(0);
 
@@ -10,7 +10,8 @@ export default function UpdateBanner() {
 
     window.electronAPI.onUpdateAvailable((info) => {
       setVersion(info.version);
-      setState('available');
+      setProgress(0);
+      setState('downloading'); // indirme main tarafında otomatik başlıyor
     });
 
     window.electronAPI.onUpdateProgress((p) => {
@@ -30,37 +31,6 @@ export default function UpdateBanner() {
       <div className="h-0.5 w-full" style={{ background: 'var(--accent)' }} />
       <div className="p-4 space-y-3">
 
-        {state === 'available' && (
-          <>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 shrink-0 flex items-center justify-center" style={{ background: 'rgba(196,255,0,0.1)' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c4ff00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                  <path d="M5 20h14"/>
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white font-mono">Güncelleme Mevcut</p>
-                <p className="text-xs font-mono mt-0.5" style={{ color: '#5c665a' }}>v{version} hazır</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setState('idle')}
-                className="flex-1 py-1.5 text-xs font-bold font-mono bg-app-raised border border-app-border hover:border-[rgba(196,255,0,0.2)] text-[#5c665a] hover:text-white transition-colors"
-              >
-                SONRA
-              </button>
-              <button
-                onClick={() => { window.electronAPI.downloadUpdate(); setState('downloading'); }}
-                className="flex-1 py-1.5 text-xs font-bold font-mono btn-accent"
-              >
-                İNDİR
-              </button>
-            </div>
-          </>
-        )}
-
         {state === 'downloading' && (
           <>
             <div className="flex items-center gap-3">
@@ -70,7 +40,7 @@ export default function UpdateBanner() {
                 </svg>
               </div>
               <div className="flex-1">
-                <p className="text-sm font-bold text-white font-mono">İndiriliyor...</p>
+                <p className="text-sm font-bold text-white font-mono">Güncelleme indiriliyor{version ? ` (v${version})` : ''}</p>
                 <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--accent)' }}>{progress}%</p>
               </div>
             </div>
@@ -96,12 +66,21 @@ export default function UpdateBanner() {
                 <p className="text-xs font-mono mt-0.5" style={{ color: '#5c665a' }}>Uygulamayı yeniden başlatarak kur</p>
               </div>
             </div>
-            <button
-              onClick={() => window.electronAPI.installUpdate()}
-              className="w-full py-2 text-xs font-bold font-mono btn-accent"
-            >
-              YENİDEN BAŞLAT VE KUR
-            </button>
+            <p className="text-[10px] font-mono" style={{ color: '#3c4238' }}>Şimdi kurmazsan uygulamayı kapattığında otomatik kurulur.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setState('idle')}
+                className="flex-1 py-1.5 text-xs font-bold font-mono bg-app-raised border border-app-border hover:border-[rgba(196,255,0,0.2)] text-[#5c665a] hover:text-white transition-colors"
+              >
+                SONRA
+              </button>
+              <button
+                onClick={() => window.electronAPI.installUpdate()}
+                className="flex-1 py-1.5 text-xs font-bold font-mono btn-accent"
+              >
+                ŞİMDİ KUR
+              </button>
+            </div>
           </>
         )}
 

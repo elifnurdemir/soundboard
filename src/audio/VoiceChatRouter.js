@@ -5,9 +5,13 @@
  * Usage:
  *   voiceChatRouter.setVirtualDevice(deviceId)
  *   voiceChatRouter.setMicPassthrough(true/false)
- *   // called by the sound store on each playSound:
- *   voiceChatRouter.playOnVirtualDevice(url, volume, loop)
+ *
+ * Sound playback itself lives in AudioEngine, which feeds speakers and the
+ * virtual cable from the same graph; the router only tells it which device to use.
  */
+import { audioEngine } from './AudioEngine';
+import { VoiceChanger } from './VoiceChanger';
+
 class VoiceChatRouter {
   constructor() {
     this.virtualDeviceId = null;
@@ -15,11 +19,20 @@ class VoiceChatRouter {
     this.micStream = null;
     this.micAudioEl = null;
     this.micAudioCtx = null;
+    this.voiceChanger = null;
+    this.voiceFx = { pitch: 0, robot: false, echo: 0 };
+  }
+
+  /** Live voice-changer params: { pitch, robot, echo }. Applied to mic passthrough. */
+  setVoiceFx(params) {
+    this.voiceFx = { ...this.voiceFx, ...params };
+    this.voiceChanger?.set(this.voiceFx);
   }
 
   /** Set the output device ID for the virtual cable. null = disabled. */
   setVirtualDevice(deviceId) {
     this.virtualDeviceId = deviceId || null;
+    audioEngine.setCableDevice(this.virtualDeviceId);
   }
 
   /** Enable/disable mic passthrough to virtual cable */
@@ -48,17 +61,22 @@ class VoiceChatRouter {
       const gain = this.micAudioCtx.createGain();
       gain.gain.value = 1;
       const dest = this.micAudioCtx.createMediaStreamDestination();
-      src.connect(gain);
+      this.voiceChanger = new VoiceChanger(this.micAudioCtx);
+      this.voiceChanger.set(this.voiceFx);
+      src.connect(this.voiceChanger.input);
+      this.voiceChanger.output.connect(gain);
       gain.connect(dest);
 
       this.micAudioEl = new Audio();
       this.micAudioEl.srcObject = dest.stream;
       this.micAudioEl.muted = false;
 
+      // Cihaza yönlendirilemezse geçişi başlatma — aksi halde mikrofon varsayılan çıkışa (hoparlör)
+      // düşer, kendi sesini gecikmeli duyarsın ve mikrofon onu tekrar yakalayıp yankı yapar.
       try {
         await this.micAudioEl.setSinkId(this.virtualDeviceId);
       } catch (e) {
-        console.warn('setSinkId for mic passthrough failed:', e.message);
+        throw new Error(`Mikrofon sanal cihaza yönlendirilemedi: ${e.message}`);
       }
 
       await this.micAudioEl.play();
@@ -71,6 +89,10 @@ class VoiceChatRouter {
   }
 
   _stopMicPassthrough() {
+    if (this.voiceChanger) {
+      this.voiceChanger.destroy();
+      this.voiceChanger = null;
+    }
     if (this.micAudioEl) {
       this.micAudioEl.pause();
       this.micAudioEl.srcObject = null;
@@ -85,30 +107,6 @@ class VoiceChatRouter {
       this.micAudioCtx = null;
     }
     this.micPassthrough = false;
-  }
-
-  /**
-   * Play a sound URL on the virtual cable device.
-   * Returns the Audio element so it can be tracked.
-   */
-  async playOnVirtualDevice(url, volume, loop = false, playbackRate = 1) {
-    if (!this.virtualDeviceId) return null;
-
-    const audio = new Audio(url);
-    audio.volume = Math.min(1, volume);
-    audio.loop = loop;
-    audio.playbackRate = playbackRate;
-    audio.preservesPitch = false;
-
-    try {
-      await audio.setSinkId(this.virtualDeviceId);
-    } catch (e) {
-      console.warn('setSinkId failed:', e.message);
-      return null;
-    }
-
-    audio.play().catch((e) => console.warn('VC play error:', e.message));
-    return audio;
   }
 
   /** Whether a device label looks like a virtual audio cable (VB-CABLE, VoiceMeeter, ...) */

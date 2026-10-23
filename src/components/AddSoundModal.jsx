@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import useSoundStore, { PRESET_COLORS, randomColor } from '../store/useSoundStore';
 import AudioTrimEditor from './AudioTrimEditor';
+import { extractAudioToMp3 } from '../audio/extractAudio';
 import ProGate from './ProGate';
 
 function ColorPicker({ value, onChange }) {
@@ -115,6 +116,8 @@ function Toggle({ value, onChange, label, description }) {
   );
 }
 
+const VIDEO_RE = /\.(mp4|webm|mkv|mov|avi|m4v)$/i;
+
 export default function AddSoundModal() {
   const { categories, addSound, updateSound, editingSound, closeAddModal, settings } = useSoundStore();
   const isEditing = !!editingSound;
@@ -133,6 +136,9 @@ export default function AddSoundModal() {
   const [trimStart, setTrimStart] = useState(editingSound?.trimStart ?? 0);
   const [trimEnd, setTrimEnd] = useState(editingSound?.trimEnd ?? null);
   const [playbackRate, setPlaybackRate] = useState(editingSound?.playbackRate ?? 1);
+  const [bass, setBass] = useState(editingSound?.bass ?? 0);
+  const [treble, setTreble] = useState(editingSound?.treble ?? 0);
+  const [reverb, setReverb] = useState(editingSound?.reverb ?? 0);
   const [cooldown, setCooldown] = useState(editingSound?.cooldown ?? 0);
   const [overlap, setOverlap] = useState(editingSound?.overlap ?? true);
   const [chatCommand, setChatCommand] = useState(editingSound?.chatCommand || '');
@@ -145,6 +151,8 @@ export default function AddSoundModal() {
   const [recording, setRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [recordError, setRecordError] = useState('');
+  const [importStatus, setImportStatus] = useState(''); // video → mp3 dönüştürme durumu
+  const [importError, setImportError] = useState('');
   const mediaRecorderRef = useRef(null);
   const recordChunksRef = useRef([]);
   const recordStreamRef = useRef(null);
@@ -242,6 +250,28 @@ export default function AddSoundModal() {
 
   // Reused by the file dialog, drag & drop onto the modal, and drag & drop onto the main window.
   const importFromPath = async (src) => {
+    setImportError('');
+    // Video: sadece sesini MP3 olarak çıkar (video kopyalanmaz, orijinal dosyaya dokunulmaz)
+    if (VIDEO_RE.test(src)) {
+      const base = src.split(/[\\/]/).pop();
+      setImportStatus('Videodan ses çıkarılıyor...');
+      try {
+        const url = /^[A-Za-z]:/.test(src) ? `file:///${src.replace(/\\/g, '/')}` : `file://${src}`;
+        const mp3 = await extractAudioToMp3(url, (p) => setImportStatus(`MP3'e çevriliyor... %${Math.round(p * 100)}`));
+        const saved = await window.electronAPI.saveRecording(mp3, 'mp3');
+        if (!saved.success) throw new Error(saved.error || 'Kaydedilemedi');
+        setFilePath(saved.destPath);
+        setFileName(`${base} (ses)`);
+        if (!name) setName(base.replace(/\.[^.]+$/, ''));
+        setTrimStart(0);
+        setTrimEnd(null);
+      } catch (err) {
+        setImportError(`Videodan ses çıkarılamadı: ${err.message}`);
+      } finally {
+        setImportStatus('');
+      }
+      return;
+    }
     const copyResult = await window.electronAPI.copyFile(src);
     const fp = copyResult.success ? copyResult.destPath : src;
     setFilePath(fp);
@@ -330,7 +360,7 @@ export default function AddSoundModal() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!filePath && !isEditing) return;
-    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, trimStart, trimEnd, playbackRate, cooldown, overlap, chatCommand, image: imagePath || '', noColor: imagePath ? noColor : false };
+    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, trimStart, trimEnd, playbackRate, bass, treble, reverb, cooldown, overlap, chatCommand, image: imagePath || '', noColor: imagePath ? noColor : false };
     if (filePath) data.filePath = filePath;
     if (isEditing) updateSound(editingSound.id, data);
     else addSound({ ...data, filePath });
@@ -410,6 +440,8 @@ export default function AddSoundModal() {
                         ? <p className="text-white text-sm font-mono truncate">{fileName}</p>
                         : <p className="text-sm font-mono" style={{ color: '#5c665a' }}>MP3, WAV, MP4... seç ya da sürükle-bırak</p>
                       }
+                      {importStatus && <p className="text-[10px] font-mono mt-0.5" style={{ color: 'var(--accent)' }}>{importStatus}</p>}
+                      {importError && <p className="text-[10px] font-mono mt-0.5 text-red-400">{importError}</p>}
                     </div>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5c665a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -636,6 +668,44 @@ export default function AddSoundModal() {
                     <p className="text-[10px] font-mono mt-1" style={{ color: '#3c4238' }}>
                       1x'ten düşük = kalın/yavaş ses, yüksek = ince/hızlı ses (sincap efekti)
                     </p>
+                  </div>
+                </ProGate>
+
+                <ProGate feature="Ses efektleri (EQ / Reverb)">
+                  <div className="space-y-3">
+                    <div>
+                      <label className={labelCls} style={{ color: '#8e9c8b' }}>
+                        Bass —{' '}
+                        <span className="font-mono" style={{ color: 'var(--accent)' }}>{bass === 0 ? 'KAPALI' : `${bass > 0 ? '+' : ''}${bass} dB`}</span>
+                      </label>
+                      <input
+                        type="range" min="-12" max="12" step="1"
+                        value={bass} onChange={(e) => setBass(Number.parseFloat(e.target.value))}
+                        className="w-full volume-slider"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls} style={{ color: '#8e9c8b' }}>
+                        Tiz —{' '}
+                        <span className="font-mono" style={{ color: 'var(--accent)' }}>{treble === 0 ? 'KAPALI' : `${treble > 0 ? '+' : ''}${treble} dB`}</span>
+                      </label>
+                      <input
+                        type="range" min="-12" max="12" step="1"
+                        value={treble} onChange={(e) => setTreble(Number.parseFloat(e.target.value))}
+                        className="w-full volume-slider"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls} style={{ color: '#8e9c8b' }}>
+                        Reverb —{' '}
+                        <span className="font-mono" style={{ color: 'var(--accent)' }}>{reverb === 0 ? 'KAPALI' : `${Math.round(reverb * 100)}%`}</span>
+                      </label>
+                      <input
+                        type="range" min="0" max="1" step="0.05"
+                        value={reverb} onChange={(e) => setReverb(Number.parseFloat(e.target.value))}
+                        className="w-full volume-slider"
+                      />
+                    </div>
                   </div>
                 </ProGate>
 

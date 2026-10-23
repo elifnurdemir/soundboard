@@ -33,6 +33,8 @@ function CooldownRing({ progress, color }) {
   );
 }
 
+const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp)$/i;
+
 export default function SoundButton({ sound }) {
   const {
     playSound, stopSoundWithFade, playingSounds,
@@ -45,6 +47,22 @@ export default function SoundButton({ sound }) {
   const isPlaying = !!(playingSounds[sound.id]?.length);
   const instanceCount = playingSounds[sound.id]?.length || 0;
   const [showControls, setShowControls] = useState(false);
+  const [imageOver, setImageOver] = useState(false);
+  // Buton genişliğine göre kontrol boyutu: full ≥120px, sm 70–119px, xs <70px
+  const wrapRef = useRef(null);
+  const [level, setLevel] = useState('full');
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width;
+      setLevel(w >= 120 ? 'full' : w >= 70 ? 'sm' : 'xs');
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const ctrlBtn = level === 'full' ? 'w-8 h-8' : level === 'sm' ? 'w-6 h-6' : 'w-5 h-5';
+  const ctrlIcon = level === 'full' ? 14 : level === 'sm' ? 11 : 9;
   const [cooldown, setCooldown] = useState(1);
   const hoverTimer = useRef(null);
   const cdTimer = useRef(null);
@@ -77,6 +95,32 @@ export default function SoundButton({ sound }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sound.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
 
+  // Görsel sürükle-bırak: butonun arka planı olur (GIF dahil — CSS background animasyonu oynatır).
+  // Ses/video dosyası ise burada tüketmeyip global handler'a bırakıyoruz ("Ses Ekle" paneli açılır).
+  const dragHasImage = (e) => {
+    const item = Array.from(e.dataTransfer?.items || []).find((i) => i.kind === 'file');
+    return !!item && /^image\//.test(item.type);
+  };
+
+  const handleImageDragOver = (e) => {
+    if (!dragHasImage(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    setImageOver(true);
+  };
+
+  const handleImageDrop = async (e) => {
+    setImageOver(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (!file || !IMAGE_RE.test(file.name)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.electronAPI || !file.path) return;
+    const res = await window.electronAPI.copyImageFile(file.path, true); // true = orijinali silme
+    if (res?.success) updateSound(sound.id, { image: res.destPath, noColor: true });
+  };
+
   const handleClick = (e) => {
     if (e.target.closest('.no-play')) return;
     if (isPlaying) stopSoundWithFade(sound.id, sound);
@@ -88,7 +132,7 @@ export default function SoundButton({ sound }) {
     updateSound(sound.id, { volume: vol });
     const instances = playingSounds[sound.id] || [];
     const gv = useSoundStore.getState().settings.globalVolume ?? 1;
-    instances.forEach(({ audio }) => { audio.volume = Math.min(1, vol * gv); });
+    instances.forEach(({ voice }) => voice.setVolume(Math.min(1, vol * gv)));
   };
 
   const { r, g, b } = hexToRgb(displayColor || '#c4ff00');
@@ -98,11 +142,14 @@ export default function SoundButton({ sound }) {
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(el) => { setNodeRef(el); wrapRef.current = el; }}
       style={style}
       className="relative fade-in"
       onMouseEnter={() => { hoverTimer.current = setTimeout(() => setShowControls(true), 150); }}
       onMouseLeave={() => { clearTimeout(hoverTimer.current); setShowControls(false); }}
+      onDragOver={handleImageDragOver}
+      onDragLeave={() => setImageOver(false)}
+      onDrop={handleImageDrop}
     >
 
       {/* Drag handle */}
@@ -128,6 +175,7 @@ export default function SoundButton({ sound }) {
           gap-1.5 overflow-hidden transition-all duration-150 select-none
           ${isPlaying ? 'playing-pulse' : isOnCooldown ? 'opacity-60 cursor-not-allowed' : 'hover:scale-[1.04] hover:brightness-110'}
           focus:outline-none
+          ${imageOver ? 'ring-2 ring-white scale-[1.06]' : ''}
         `}
         style={{
           backgroundColor: (sound.image && sound.noColor) ? '#0b0d0b' : displayColor,
@@ -201,22 +249,24 @@ export default function SoundButton({ sound }) {
         {/* Volume slider on hover */}
         {showControls && (
           <div
-            className="no-play absolute bottom-0 left-0 right-0 bg-black/70 backdrop-blur-sm px-2 py-1.5"
+            className={`no-play absolute bottom-0 left-0 right-0 bg-black/70 backdrop-blur-sm ${level === 'full' ? 'px-2 py-1.5' : 'px-1 py-1'}`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-1.5">
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="white" opacity="0.6">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {level === 'full' && <svg width="9" height="9" viewBox="0 0 24 24" fill="white" opacity="0.6">
                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
-              </svg>
+              </svg>}
               <input
                 type="range" min="0" max="1" step="0.02"
                 value={sound.volume ?? 0.8}
                 onChange={handleVolumeChange}
-                className="no-play flex-1 volume-slider"
+                className="no-play flex-1 min-w-0 volume-slider"
               />
-              <span className="text-white text-[9px] w-5 text-right opacity-60 font-mono">
-                {Math.round((sound.volume ?? 0.8) * 100)}
-              </span>
+              {level !== 'xs' && (
+                <span className="text-white text-[9px] w-5 shrink-0 text-right opacity-60 font-mono">
+                  {Math.round((sound.volume ?? 0.8) * 100)}
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -224,30 +274,30 @@ export default function SoundButton({ sound }) {
 
       {/* Edit/Delete */}
       {showControls && (
-        <div className="no-play absolute top-1.5 right-1.5 flex gap-1 z-30">
-          <button
+        <div className={`no-play absolute z-30 flex gap-1 ${level === 'xs' ? 'top-0.5 right-0.5 flex-col' : 'top-1.5 right-1.5'}`}>
+          {level !== 'xs' && <button
             onClick={(e) => { e.stopPropagation(); toggleFavorite(sound.id); }}
-            className={`w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-black/85 backdrop-blur-sm transition-colors ${sound.favorite ? 'text-yellow-400' : 'text-white/80 hover:text-white'}`}
+            className={`${ctrlBtn} flex items-center justify-center bg-black/60 hover:bg-black/85 backdrop-blur-sm transition-colors ${sound.favorite ? 'text-yellow-400' : 'text-white/80 hover:text-white'}`}
             title={sound.favorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={sound.favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width={ctrlIcon} height={ctrlIcon} viewBox="0 0 24 24" fill={sound.favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
             </svg>
-          </button>
+          </button>}
           <button
             onClick={(e) => { e.stopPropagation(); openAddModal(sound); }}
-            className="w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-black/85 backdrop-blur-sm text-white/80 hover:text-white transition-colors"
+            className={`${ctrlBtn} flex items-center justify-center bg-black/60 hover:bg-black/85 backdrop-blur-sm text-white/80 hover:text-white transition-colors`}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width={ctrlIcon} height={ctrlIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); deleteSound(sound.id); }}
-            className="w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-red-600/80 backdrop-blur-sm text-white/80 hover:text-white transition-colors"
+            className={`${ctrlBtn} flex items-center justify-center bg-black/60 hover:bg-red-600/80 backdrop-blur-sm text-white/80 hover:text-white transition-colors`}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width={ctrlIcon} height={ctrlIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6"/>
               <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
             </svg>

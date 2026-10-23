@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import useSoundStore from "../store/useSoundStore";
-import useLicenseStore from "../store/useLicenseStore";
+import useLicenseStore, { LICENSING_ENABLED } from "../store/useLicenseStore";
 import ProGate from "./ProGate";
 
 function UpdateChecker() {
@@ -293,28 +293,22 @@ export default function SettingsPanel() {
               </div>
             </div>
 
-            <Row label="Izgara Sütunları" description="Grid'deki sütun sayısı">
-              <select
-                value={settings.gridColumns || 5}
-                onChange={(e) =>
-                  updateSettings({ gridColumns: parseInt(e.target.value) })
-                }
-                className="bg-app-input border border-app-border px-2 py-1.5 text-sm text-white outline-none focus-lime font-mono"
-                style={{ color: "var(--accent)" }}
-              >
-                {[3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 28, 32].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+            <Row label="Satırdaki Buton" description={`${Math.min(20, Math.max(1, settings.gridColumns || 5))} buton`}>
+              <input
+                type="range" min="1" max="20" step="1"
+                value={Math.min(20, Math.max(1, settings.gridColumns || 5))}
+                onChange={(e) => updateSettings({ gridColumns: Number.parseInt(e.target.value, 10) })}
+                className="w-40 volume-slider"
+              />
             </Row>
           </Section>
 
           {/* Pro */}
-          <Section title="Pro">
-            <LicenseSection />
-          </Section>
+          {LICENSING_ENABLED && (
+            <Section title="Pro">
+              <LicenseSection />
+            </Section>
+          )}
 
           {/* Ses */}
           <Section title="Ses">

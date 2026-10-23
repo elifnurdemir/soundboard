@@ -180,7 +180,9 @@ app.whenReady().then(() => {
   }, 60000);
   // Check for updates 5 seconds after launch (only in packaged app)
   if (app.isPackaged) {
-    setTimeout(() => autoUpdater.checkForUpdates(), 5000);
+    setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000);
+    // Uygulama günlerce açık kalabiliyor (tray) — periyodik tekrar kontrol et
+    setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 4 * 60 * 60 * 1000);
   }
 
   app.on('second-instance', () => {
@@ -223,6 +225,29 @@ ipcMain.handle('save-data', async (_, data) => {
 
 ipcMain.handle('get-data-path', () => getDataPath());
 
+// ─── Ortak oda (arkadaşlar tarayıcıdan ses tetikler) ─────────────────────────────
+const { createRoom } = require('./room');
+const room = createRoom({
+  getData: () => {
+    try {
+      const p = getDataPath();
+      return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf-8')) : null;
+    } catch (_) { return null; }
+  },
+  onPlay: (payload) => mainWindow?.webContents.send('room-play', payload),
+});
+ipcMain.handle('room-start', async (_, port) => {
+  try {
+    const p = Number.isInteger(port) && port >= 1024 && port <= 65535 ? port : undefined;
+    return { success: true, ...(await room.start(p)) };
+  } catch (err) {
+    return { success: false, error: err.code === 'EADDRINUSE' ? 'Bu port zaten kullanımda.' : err.message };
+  }
+});
+ipcMain.handle('room-stop', () => ({ success: true, ...room.stop() }));
+ipcMain.handle('room-status', () => ({ success: true, ...room.status() }));
+app.on('before-quit', () => room.stop());
+
 // ─── Licensing (LemonSqueezy) ───────────────────────────────────────────────────
 // Deliberately stored OUTSIDE soundboard-data.json — must never travel through
 // export-zip/import-zip, or a license would get copied along with someone's sounds.
@@ -247,7 +272,12 @@ function writeLicenseFile(data) {
 // Enforcement lives here, not just in the renderer's ProGate UI — a locked-out user
 // poking at React state or calling window.electronAPI directly from DevTools still
 // hits this same check, since the privileged action itself refuses to run without it.
+// Lisanslama kapalıyken (false) tüm Pro özellikleri herkese açık. Renderer'daki
+// LICENSING_ENABLED (src/store/useLicenseStore.js) ile aynı değer olmalı.
+const LICENSING_ENABLED = false;
+
 function requireProOrError() {
+  if (!LICENSING_ENABLED) return null;
   const stored = readLicenseFile();
   if (stored?.status === 'pro') return null;
   return { success: false, error: 'Bu özellik Pro sürümde açılıyor. Ayarlar > Pro bölümünden satın alabilirsin.' };
@@ -377,7 +407,8 @@ ipcMain.handle('open-image-dialog', async () => {
   });
 });
 
-ipcMain.handle('copy-image-file', async (_, srcPath) => {
+// keepOriginal: sürükle-bırak gibi kullanıcının kendi dosyası söz konusuysa orijinali silme
+ipcMain.handle('copy-image-file', async (_, srcPath, keepOriginal = false) => {
   try {
     const folder = path.join(app.getPath('userData'), 'images');
     if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
@@ -393,7 +424,9 @@ ipcMain.handle('copy-image-file', async (_, srcPath) => {
     }
     if (!fs.existsSync(destPath)) {
       fs.copyFileSync(srcPath, destPath);
-      try { fs.unlinkSync(srcPath); } catch (_) { /* original may be read-only/in-use — copy already succeeded */ }
+      if (!keepOriginal) {
+        try { fs.unlinkSync(srcPath); } catch (_) { /* original may be read-only/in-use — copy already succeeded */ }
+      }
     }
     return { success: true, destPath };
   } catch (err) {
@@ -436,9 +469,10 @@ function sameFile(a, b) {
   } catch { return false; }
 }
 
-// Copies (and removes the source of) a file into the sounds folder,
+// Copies a file into the sounds folder (and removes the source unless keepOriginal — used for
+// temp files like YouTube downloads; user-picked/dropped files are never deleted),
 // renaming on collision with a different file of the same name.
-function moveIntoSoundsFolder(srcPath) {
+function moveIntoSoundsFolder(srcPath, keepOriginal = false) {
   const folder = getSoundsFolder();
   const ext = path.extname(srcPath);
   const base = path.basename(srcPath, ext);
@@ -452,14 +486,16 @@ function moveIntoSoundsFolder(srcPath) {
   }
   if (!fs.existsSync(destPath)) {
     fs.copyFileSync(srcPath, destPath);
-    try { fs.unlinkSync(srcPath); } catch (_) { /* original may be read-only/in-use — copy already succeeded */ }
+    if (!keepOriginal) {
+      try { fs.unlinkSync(srcPath); } catch (_) { /* original may be read-only/in-use — copy already succeeded */ }
+    }
   }
   return destPath;
 }
 
 ipcMain.handle('copy-sound-file', async (_, srcPath) => {
   try {
-    return { success: true, destPath: moveIntoSoundsFolder(srcPath) };
+    return { success: true, destPath: moveIntoSoundsFolder(srcPath, true) };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -853,8 +889,10 @@ ipcMain.handle('unregister-shortcuts', () => { registeredShortcuts = []; });
 app.on('will-quit', () => uIOhook.stop());
 
 // ─── Auto Updater ─────────────────────────────────────────────────────────────
-autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = false;
+// Tam otomatik: güncelleme bulununca arka planda iner, uygulama kapanırken (ya da kullanıcı
+// "yeniden başlat"a basınca) kurulur.
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
 
 autoUpdater.on('update-available', (info) => {
   mainWindow?.webContents.send('update-available', info);
@@ -877,7 +915,7 @@ ipcMain.handle('check-for-updates', () => {
 });
 
 ipcMain.handle('download-update', () => {
-  autoUpdater.downloadUpdate();
+  // autoDownload açık — geriye dönük uyumluluk için bırakıldı, indirme zaten başlamış olur
 });
 
 ipcMain.handle('install-update', () => {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import useSoundStore from '../store/useSoundStore';
 import useStreamStore from '../store/useStreamStore';
+import useCollageStore from '../store/useCollageStore';
 
 function WindowControls() {
   const [isMax, setIsMax] = useState(false);
@@ -101,6 +102,18 @@ export default function Header() {
         >
           <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18"/></svg>
           DURDUR
+        </button>
+
+        {/* Stüdyo: çok kanallı ses editörü */}
+        <button
+          onClick={() => useCollageStore.getState().open()}
+          className="h-8 px-2.5 flex items-center gap-1.5 text-[11px] font-bold font-mono tracking-wider text-[#5c665a] hover:text-[#c4ff00] hover:bg-app-surface transition-colors"
+          title="Stüdyo: kayıt al, düzenle, birleştir"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="15" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="5" y1="18" x2="17" y2="18"/>
+          </svg>
+          STÜDYO
         </button>
 
         {/* Voice Chat */}
