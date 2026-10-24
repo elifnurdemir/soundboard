@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import useSoundStore from '../store/useSoundStore';
 import useStreamStore from '../store/useStreamStore';
 import useCollageStore from '../store/useCollageStore';
-import { PadoMascot } from './Pado';
-
 function WindowControls() {
   const [isMax, setIsMax] = useState(false);
   useEffect(() => { window.electronAPI?.isMaximized().then(setIsMax); }, []);
@@ -57,11 +55,6 @@ export default function Header() {
           }))}
         </svg>
         <span className="font-bold text-white text-sm tracking-widest uppercase font-mono">SOUNDBOARD</span>
-      </div>
-
-      {/* Maskot: dokununca bir hareket yapar, uygulamanın durumuna göre ruh hali değişir */}
-      <div className="titlebar-no-drag shrink-0 flex items-center">
-        <PadoMascot size={52} />
       </div>
 
       {/* Search */}
