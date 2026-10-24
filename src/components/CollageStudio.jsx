@@ -6,12 +6,17 @@ import {
   prepareRecording, countIn, toUrl,
 } from '../audio/collageEngine';
 import { extractAudioToMp3, encodeAudioBufferToMp3 } from '../audio/extractAudio';
+import Pado, { PadoMascot } from './Pado';
+import usePadoStore from '../store/usePadoStore';
+import useOnlineStore, { SUGGESTIONS, creditOf } from '../store/useOnlineStore';
+import { fmtDur, useElapsed, loadingLine } from './OnlineBoard';
 
 const HEADER_W = 224;
 const ROW_H = 104;
 const RULER_H = 28;
 const VIDEO_RE = /\.(mp4|webm|mkv|mov|avi|m4v)$/i;
 const SOUND_MIME = 'application/x-sb-sound';
+const ONLINE_MIME = 'application/x-sb-online';
 
 const C = {
   bg: '#0a0c0a', panel: '#0e110e', card: '#121612', border: '#1d231d', line: '#2a302a',
@@ -89,6 +94,7 @@ async function startRecordFlow() {
     rec = await prepareRecording({ monitor: st.monitor, onLevel: (l) => S().setRecLevel(l) });
   } catch (err) {
     S().setStatus(`Mikrofona erişilemedi: ${err.message}`);
+    usePadoStore.getState().alarm();
     return;
   }
   if (st.countInOn) {
@@ -180,7 +186,33 @@ async function addFileClip({ name, path, file }, trackId, t) {
   }
 }
 
+// Çevrimiçi ses: önizleme indirme değildi, indirme ancak buraya (zaman çizelgesine) alınınca olur
+async function addOnlineClip(item, trackId, t) {
+  S().setStatus(`İndiriliyor: ${item.title}...`);
+  const src = await useOnlineStore.getState().fetchFile(item);
+  if (!src) {
+    S().setStatus(`İndirilemedi: ${item.title}${useOnlineStore.getState().error ? ` (${useOnlineStore.getState().error})` : ''}`);
+    return t;
+  }
+  try {
+    const buffer = await loadBuffer(src);
+    S().addClip({
+      trackId, name: item.title, src, srcDur: buffer.duration, start: t, offset: 0, dur: buffer.duration, credit: creditOf(item),
+    });
+    S().setStatus('');
+    return t + buffer.duration;
+  } catch (err) {
+    S().setStatus(`Eklenemedi: ${item.title} (${err.message})`);
+    return t;
+  }
+}
+
 async function handleDrop(dt, trackId, t) {
+  const onlineRaw = dt.getData(ONLINE_MIME);
+  if (onlineRaw) {
+    try { await addOnlineClip(JSON.parse(onlineRaw), trackId, t); } catch (_) { S().setStatus('Çevrimiçi ses okunamadı.'); }
+    return;
+  }
   const soundId = dt.getData(SOUND_MIME);
   const files = Array.from(dt.files || []);
   if (soundId) { await addSoundClip(soundId, trackId, t); return; }
@@ -193,7 +225,7 @@ async function handleDrop(dt, trackId, t) {
 
 const hasPayload = (e) => {
   const types = Array.from(e.dataTransfer?.types || []);
-  return types.includes('Files') || types.includes(SOUND_MIME);
+  return types.includes('Files') || types.includes(SOUND_MIME) || types.includes(ONLINE_MIME);
 };
 
 // ─── Küçük parçalar ────────────────────────────────────────────────────────────
@@ -500,9 +532,98 @@ function Timeline() {
   );
 }
 
+function OnlineRow({ item, onAdd }) {
+  const playing = useOnlineStore((s) => s.playingId === item.id);
+  const busy = useOnlineStore((s) => !!s.downloading[item.id]);
+  const toggle = useOnlineStore((s) => s.togglePreview);
+  return (
+    <div
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData(ONLINE_MIME, JSON.stringify(item)); e.dataTransfer.effectAllowed = 'copy'; }}
+      title="Zaman çizelgesine sürükle: o zaman iner"
+      className="flex items-center gap-2 px-2 py-1.5 cursor-grab"
+      style={{ background: playing ? 'rgba(196,255,0,0.1)' : C.card }}
+    >
+      <button
+        type="button" onClick={() => toggle(item)} aria-label={playing ? 'Durdur' : `${item.title} dinle`}
+        className="w-7 h-7 shrink-0 text-[11px]" style={{ background: playing ? C.accent : '#1a1f1a', color: playing ? '#0b0d0b' : C.text, border: 0 }}
+      >
+        {playing ? '■' : '▶'}
+      </button>
+      <div className="flex-1 min-w-0 flex flex-col">
+        <span className="text-[12px] font-semibold truncate">{item.title}</span>
+        <span className="text-[10px] truncate" style={{ color: C.dim }}>{item.creator || 'Bilinmeyen'} · {fmtDur(item.durationMs)}</span>
+      </div>
+      <button
+        type="button" onClick={() => onAdd(item)} disabled={busy} aria-label={`${item.title} ekle`}
+        className="w-6 h-6 text-sm disabled:opacity-50" style={{ border: `1px solid ${C.line}`, color: C.text, background: 'transparent' }}
+      >
+        {busy ? '…' : '+'}
+      </button>
+    </div>
+  );
+}
+
+function OnlineTab({ onAdd }) {
+  const { query, results, loading, loadingKind, error, quota, searched, hasMore, search, loadMore } = useOnlineStore();
+  const [text, setText] = useState(query);
+  const sec = useElapsed(loading);
+
+  useEffect(() => {
+    if (!searched && window.electronAPI) search('sound effect');
+  }, []);
+
+  const submit = (e) => { e.preventDefault(); search(text); };
+
+  return (
+    <>
+      <form onSubmit={submit} className="flex gap-1.5">
+        <input
+          value={text} onChange={(e) => setText(e.target.value)} placeholder="Çevrimiçi ses ara..." aria-label="Çevrimiçi ses ara"
+          className="flex-1 min-w-0 h-9 px-3 text-sm outline-none text-white font-mono" style={{ background: C.card, border: `1px solid ${C.border}` }}
+        />
+        <button type="submit" disabled={loading || !text.trim()} className="h-9 px-3 text-xs font-bold disabled:opacity-50" style={{ background: C.accent, color: '#0b0d0b', border: 0 }}>ARA</button>
+      </form>
+      <div className="flex flex-wrap gap-1">
+        {SUGGESTIONS.slice(0, 6).map((w) => (
+          <button key={w} type="button" onClick={() => { setText(w); search(w); }} className="px-2 py-0.5 text-[10px]" style={{ background: '#1a1f1a', color: C.muted, border: 0 }}>{w}</button>
+        ))}
+      </div>
+      {loading ? (
+        <div className="flex items-center gap-2" role="status">
+          <Pado mood="searching" size={64} />
+          <span className="text-[11px] leading-snug" style={{ color: C.accent }}>{loadingLine(loadingKind, sec, query)}</span>
+        </div>
+      ) : (
+        <div className="text-[10px] font-mono" style={{ color: C.dim }}>
+          {searched && !error ? `${results.length} sonuç gösteriliyor` : ''}
+          {quota ? ` · kalan: günde ${quota.day ?? '?'}` : ''}
+        </div>
+      )}
+      {error && <p className="text-[11px] p-2" style={{ background: 'rgba(255,90,77,0.1)', color: '#ffb3aa' }}>{error}</p>}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1.5">
+        {results.map((item) => <OnlineRow key={item.id} item={item} onAdd={onAdd} />)}
+        {hasMore && (
+          <button type="button" onClick={loadMore} disabled={loading} className="h-8 text-[11px] font-bold disabled:opacity-50" style={{ background: '#1a1f1a', color: C.muted, border: 0 }}>
+            {loading ? 'YÜKLENİYOR...' : 'DAHA FAZLA'}
+          </button>
+        )}
+      </div>
+      <div className="text-[11px] leading-relaxed p-2.5" style={{ border: `1px dashed ${C.line}`, color: C.muted }}>
+        ▶ sadece dinletir, <strong style={{ color: C.text }}>hiçbir şey indirmez</strong>. Zaman çizelgesine sürükleyince (ya da +) ses o zaman iner. Openverse, CC0.
+      </div>
+    </>
+  );
+}
+
 function Library() {
   const sounds = useSoundStore((s) => s.sounds);
   const [q, setQ] = useState('');
+  const [tab, setTab] = useState('mine');
+
+  // sekme değişince ya da panel kapanınca çalan önizleme dursun
+  useEffect(() => { if (tab !== 'online') useOnlineStore.getState().stop(); }, [tab]);
+  useEffect(() => () => useOnlineStore.getState().stop(), []);
   const list = sounds.filter((s) => s.name.toLowerCase().includes(q.toLowerCase()));
 
   const addFromDialog = async () => {
@@ -518,6 +639,13 @@ function Library() {
     }
   };
 
+  const addOnlineAtPlayhead = (item) => {
+    const st = S();
+    const sel = st.project.clips.find((c) => c.id === st.selectedClipId);
+    const trackId = sel?.trackId || st.project.tracks.find((t) => t.armed)?.id || st.project.tracks[0].id;
+    addOnlineClip(item, trackId, st.snapTime(st.position));
+  };
+
   const addAtPlayhead = (sound) => {
     const st = S();
     const sel = st.project.clips.find((c) => c.id === st.selectedClipId);
@@ -527,8 +655,20 @@ function Library() {
 
   return (
     <aside className="shrink-0 flex flex-col gap-3 p-3 box-border" style={{ width: 280, background: C.panel, borderRight: `1px solid ${C.border}` }}>
-      <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-bold">Seslerim</h2>
+      <div role="tablist" aria-label="Kaynak" className="flex" style={{ background: C.card, padding: 3, gap: 2 }}>
+        {[['mine', 'Seslerim'], ['online', 'Çevrimiçi']].map(([id, label]) => (
+          <button
+            key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+            className="flex-1 h-8 text-xs font-bold"
+            style={{ background: tab === id ? '#232923' : 'transparent', color: tab === id ? C.text : C.muted, border: 0 }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'online' ? <OnlineTab onAdd={addOnlineAtPlayhead} /> : (
+      <>
+      <div className="flex items-center justify-end">
         <button type="button" onClick={addFromDialog} className="text-[11px] font-bold font-mono" style={{ color: C.accent, background: 'transparent', border: 0 }}>+ DOSYA</button>
       </div>
       <input
@@ -554,8 +694,10 @@ function Library() {
         ))}
       </div>
       <div className="text-[11px] leading-relaxed p-2.5" style={{ border: `1px dashed ${C.line}`, color: C.muted }}>
-        Ses ya da video dosyasını doğrudan zaman çizelgesine sürükleyebilirsin. Çevrimiçi kütüphane yakında.
+        Ses ya da video dosyasını doğrudan zaman çizelgesine sürükleyebilirsin. "Çevrimiçi" sekmesinde ücretsiz sesler var.
       </div>
+      </>
+      )}
     </aside>
   );
 }
@@ -700,6 +842,7 @@ function MergeDialog({ onClose }) {
     if (!project.clips.length) { setError('Önce zaman çizelgesine bir ses ekle.'); return; }
     try {
       stopPlayback();
+      usePadoStore.getState().setBusy(true);
       setBusy('Karıştırılıyor...');
       const rendered = await renderProject(project, { normalize });
       const mp3 = await encodeAudioBufferToMp3(rendered, (p) => setBusy(`MP3'e çevriliyor... %${Math.round(p * 100)}`), 192);
@@ -708,9 +851,13 @@ function MergeDialog({ onClose }) {
       useSoundStore.getState().addSound({ name: name.trim() || 'Ses', filePath, categoryId });
       setBusy('');
       setDone(true);
+      usePadoStore.getState().setBusy(false);
+      usePadoStore.getState().celebrate();
     } catch (err) {
       setBusy('');
       setError(`Birleştirilemedi: ${err.message}`);
+      usePadoStore.getState().setBusy(false);
+      usePadoStore.getState().alarm();
     }
   };
 
@@ -849,6 +996,7 @@ export default function CollageStudio() {
       <header className="shrink-0 flex items-center gap-3 px-5 box-border" style={{ height: 56, background: C.panel, borderBottom: `1px solid ${C.border}` }}>
         <button type="button" onClick={() => S().close()} className="text-sm font-medium" style={{ color: C.muted, background: 'transparent', border: 0 }}>← Soundboard</button>
         <div style={{ width: 1, height: 24, background: C.line }} />
+        <PadoMascot size={44} />
         <input
           value={project.name} onChange={(e) => S().setName(e.target.value)} aria-label="Proje adı"
           className="h-9 px-3 text-[15px] font-semibold outline-none text-white"

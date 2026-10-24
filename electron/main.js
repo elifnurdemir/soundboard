@@ -462,6 +462,11 @@ const getSoundsFolder = () => {
 
 ipcMain.handle('get-sounds-folder', () => getSoundsFolder());
 
+// Çevrimiçi ses kütüphanesi (Openverse, CC0): arama ve indirme ana süreçte yapılır
+const online = require('./online');
+ipcMain.handle('online-search', (_, query, page) => online.search(query, page));
+ipcMain.handle('online-download', (_, item) => online.download(item, getSoundsFolder()));
+
 function sameFile(a, b) {
   try {
     const sa = fs.statSync(a), sb = fs.statSync(b);

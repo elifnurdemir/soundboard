@@ -13,17 +13,13 @@ import {
 import useSoundStore from '../store/useSoundStore';
 import SoundButton from './SoundButton';
 import KeyboardView from './KeyboardView';
+import { PadoMascot } from './Pado';
+import OnlineBoard from './OnlineBoard';
 
 function EmptyState({ onAdd, isFiltered }) {
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-64 gap-5 text-center">
-      <div className="bracket-4 p-6 bg-app-surface">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3c4238" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9 18V5l12-2v13"/>
-          <circle cx="6" cy="18" r="3"/>
-          <circle cx="18" cy="16" r="3"/>
-        </svg>
-      </div>
+      <PadoMascot size={230} />
       <div>
         <h3 className="font-bold text-sm uppercase tracking-widest mb-1" style={{ color: isFiltered ? '#8e9c8b' : 'var(--accent)' }}>
           {isFiltered ? 'SONUÇ YOK' : 'HENÜZ SES YOK'}
@@ -101,6 +97,9 @@ export default function SoundGrid() {
   }, [reorderSounds]);
 
   const cols = Math.min(20, Math.max(1, settings.gridColumns || 5));
+
+  // Kenar çubuğundan "Çevrimiçi Sesler": yerel butonlar yerine Openverse'teki sesler
+  if (activeCategory === 'online') return <OnlineBoard />;
 
   if (viewMode === 'keyboard') {
     return (

@@ -44,6 +44,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   restoreAppDevice: (exeName, deviceId) => ipcRenderer.invoke('restore-app-device', exeName, deviceId),
   resetAllAppRouting: () => ipcRenderer.invoke('reset-all-app-routing'),
   syncRoutedApps: (snapshot) => ipcRenderer.invoke('sync-routed-apps', snapshot),
+  onlineSearch: (query, page) => ipcRenderer.invoke('online-search', query, page),
+  onlineDownload: (item) => ipcRenderer.invoke('online-download', item),
   roomStart: (port) => ipcRenderer.invoke('room-start', port),
   roomStop: () => ipcRenderer.invoke('room-stop'),
   roomStatus: () => ipcRenderer.invoke('room-status'),

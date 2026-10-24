@@ -106,6 +106,26 @@ export default function Sidebar() {
 
       {/* Category list */}
       <nav className="flex-1 overflow-y-auto py-1 space-y-0.5">
+        {/* Çevrimiçi sesler: board'u Openverse'teki seslere çevirir */}
+        <div
+          className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-all mx-1 mb-1 ${
+            activeCategory === 'online'
+              ? 'bg-[rgba(196,255,0,0.08)] border-l-2'
+              : 'text-[#8e9c8b] hover:bg-app-surface hover:text-[#d0d8ce]'
+          }`}
+          style={activeCategory === 'online' ? { borderLeftColor: 'var(--accent)', color: 'var(--accent)' } : {}}
+          onClick={() => setActiveCategory('online')}
+          title="Openverse'teki ücretsiz (CC0) sesler: sadece dinle, istersen indir"
+        >
+          <svg className="shrink-0" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+          </svg>
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-mono leading-tight">Çevrimiçi Sesler</span>
+            <span className="block text-[9px] font-mono leading-tight opacity-60">Openverse · CC0</span>
+          </span>
+        </div>
+
         {/* All sounds */}
         <div
           className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-all mx-1 ${

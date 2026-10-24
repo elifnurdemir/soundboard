@@ -1,0 +1,132 @@
+/* Pado — gerçek CSS 3D: katmanlar farklı derinlikte (translateZ), gövde perspektif içinde döner.
+   Ağız yok: duygu gözlerden, kaşlardan ve etraftaki işaretlerden gelir. */
+
+.pd { --pd-main: #c4ff00; position: relative; flex-shrink: 0; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+.pd-stage { position: absolute; left: 0; top: 0; width: 860px; height: 720px; transform-origin: 0 0; }
+.pd-persp { position: absolute; inset: 0; perspective: 1500px; perspective-origin: 430px 380px; }
+.pd-body { position: absolute; inset: 0; transform-style: preserve-3d; transform-origin: 430px 380px; }
+.pd-l { position: absolute; left: 430px; top: 380px; width: 0; height: 0; }
+.pd-sh { position: absolute; left: 160px; top: 656px; width: 540px; height: 54px; border-radius: 50%; background: rgba(0, 0, 0, .4); }
+.pd-fx { position: absolute; inset: 0; pointer-events: none; }
+.pd-fx > * { position: absolute; opacity: 0; }
+
+/* yüz parçaları: hangisi görünür, ruh haline bağlı */
+.pd-eo, .pd-ew, .pd-eh, .pd-ec, .pd-po, .pd-brw { position: absolute; left: 0; top: 0; opacity: 0; transition: opacity .2s; }
+.pd-m-idle .pd-eo, .pd-m-idle .pd-po,
+.pd-m-editing .pd-eo, .pd-m-editing .pd-po,
+.pd-m-working .pd-eo, .pd-m-working .pd-po,
+.pd-m-recording .pd-ew, .pd-m-recording .pd-po,
+.pd-m-alarm .pd-ew, .pd-m-alarm .pd-po, .pd-m-alarm .pd-brw,
+.pd-m-playing .pd-eh, .pd-m-celebrate .pd-eh,
+.pd-m-sleeping .pd-ec { opacity: 1; }
+
+.pd-m-alarm .pd-shell { border-color: #ff5a4d !important; }
+
+/* ruh halleri */
+.pd-m-idle .pd-eL, .pd-m-idle .pd-eR { animation: pd-blink 4.2s infinite; }
+.pd-m-playing .pd-body { animation: pd-bob .5s ease-in-out infinite; }
+.pd-m-celebrate .pd-body { animation: pd-bob .55s ease-in-out infinite; }
+.pd-m-alarm .pd-body { animation: pd-shake .35s infinite; }
+.pd-m-editing .pd-po, .pd-m-working .pd-po { animation: pd-scan 1.8s ease-in-out infinite; }
+.pd-m-sleeping .pd-body { animation: pd-snore 3.4s ease-in-out infinite; }
+
+.pd-rings { position: absolute; inset: 0; pointer-events: none; }
+.pd-rings i { position: absolute; left: 110px; top: 138px; width: 640px; height: 484px; box-sizing: border-box; border: 6px solid var(--pd-main); border-radius: 150px; opacity: 0; }
+.pd-m-playing .pd-rings i { animation: pd-ring 1.6s ease-out infinite; }
+.pd-rings i:nth-child(2) { animation-delay: .5s !important; }
+.pd-rings i:nth-child(3) { animation-delay: 1s !important; }
+
+.pd-note { font: 700 64px/1 system-ui, sans-serif; color: var(--pd-main); }
+.pd-m-playing .pd-note { animation: pd-note 2s ease-out infinite; }
+.pd-m-playing .pd-note:nth-child(2) { animation-delay: .7s; }
+.pd-m-playing .pd-note:nth-child(3) { animation-delay: 1.3s; }
+
+.pd-rec { left: 600px; top: 30px; display: flex; align-items: center; gap: 12px; font: 700 40px/1 ui-monospace, monospace; color: #ff5a4d; }
+.pd-rec i { width: 28px; height: 28px; border-radius: 50%; background: #ff5a4d; }
+.pd-m-recording .pd-rec { opacity: 1; }
+.pd-m-recording .pd-rec i { animation: pd-pulse 1s infinite; }
+.pd-mic { left: 700px; top: 470px; width: 50px; height: 90px; border-radius: 25px; background: #e9efe7; }
+.pd-mic::after { content: ''; position: absolute; left: 24px; top: 100px; width: 4px; height: 50px; background: #e9efe7; }
+.pd-m-recording .pd-mic { opacity: 1; }
+
+.pd-cut { left: 690px; top: 60px; width: 110px; height: 110px; }
+.pd-cut b { position: absolute; left: 50px; top: 0; width: 10px; height: 80px; border-radius: 5px; background: #e9efe7; transform-origin: 50% 50%; }
+.pd-cut b:nth-child(1) { transform: rotate(35deg); }
+.pd-cut b:nth-child(2) { transform: rotate(-35deg); }
+.pd-m-editing .pd-cut { opacity: 1; animation: pd-snip .5s ease-in-out infinite; }
+
+.pd-dots { left: 650px; top: 120px; width: 150px; height: 30px; }
+.pd-dots i { position: absolute; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--pd-main); }
+.pd-dots i:nth-child(1) { left: 0; } .pd-dots i:nth-child(2) { left: 50px; } .pd-dots i:nth-child(3) { left: 100px; }
+.pd-m-working .pd-dots { opacity: 1; }
+.pd-m-working .pd-dots i { animation: pd-dot 1s ease-in-out infinite; }
+.pd-dots i:nth-child(2) { animation-delay: .15s !important; } .pd-dots i:nth-child(3) { animation-delay: .3s !important; }
+
+.pd-z { left: 700px; top: 70px; font: 700 64px/1 ui-monospace, monospace; color: #a3ae9f; }
+.pd-z + .pd-z { left: 740px; top: 20px; font-size: 84px; }
+.pd-m-sleeping .pd-z { animation: pd-zz 2.4s ease-in-out infinite; }
+.pd-m-sleeping .pd-z + .pd-z { animation-delay: .8s; }
+
+.pd-sweat { left: 660px; top: 300px; width: 40px; height: 40px; border-radius: 0 50% 50% 50%; transform: rotate(45deg); background: #5ea8ff; }
+.pd-m-alarm .pd-sweat { opacity: 1; }
+
+.pd-conf { width: 20px; height: 28px; border-radius: 4px; top: 0; }
+.pd-m-celebrate .pd-conf { animation: pd-fall 2s linear infinite; }
+.pd-conf:nth-child(1) { left: 90px; background: #c4ff00; } .pd-conf:nth-child(2) { left: 190px; background: #ff9a4d; animation-delay: .4s !important; }
+.pd-conf:nth-child(3) { left: 300px; background: #5ea8ff; animation-delay: .9s !important; } .pd-conf:nth-child(4) { left: 410px; background: #c58bff; animation-delay: 1.3s !important; }
+.pd-conf:nth-child(5) { left: 520px; background: #ff5a4d; animation-delay: .2s !important; } .pd-conf:nth-child(6) { left: 640px; background: #c4ff00; animation-delay: .7s !important; }
+.pd-conf:nth-child(7) { left: 740px; background: #ffb347; animation-delay: 1.1s !important; }
+
+.pd-q { left: 700px; top: 30px; font: 800 150px/1 system-ui, sans-serif; color: var(--pd-main); }
+
+/* tek seferlik hareketler: üstü her şeyi ezer, bitince ruh haline döner */
+.pd-g-hello .pd-body { animation: pd-hello 2.4s cubic-bezier(.3, 1.4, .5, 1) 1 !important; }
+.pd-g-hello .pd-eL, .pd-g-hello .pd-eR { animation: pd-blink2 2.4s 1 !important; }
+.pd-g-nod .pd-body { animation: pd-nod 2.2s ease-in-out 1 !important; }
+.pd-g-nod .pd-eo, .pd-g-nod .pd-po { animation: pd-hide 2.2s 1 !important; }
+.pd-g-nod .pd-eh { animation: pd-show 2.2s 1 !important; }
+.pd-g-brow .pd-body { animation: pd-browbody 2.8s ease-in-out 1 !important; }
+.pd-g-brow .pd-bR { animation: pd-browR 2.8s ease-in-out 1 !important; }
+.pd-g-brow .pd-eL { animation: pd-squint 2.8s ease-in-out 1 !important; }
+.pd-g-brow .pd-po { animation: pd-look 2.8s ease-in-out 1 !important; }
+.pd-g-brow .pd-q { animation: pd-pop 2.8s ease-out 1; }
+.pd-g-wink .pd-body { animation: pd-winkbody 1.6s ease-in-out 1 !important; }
+.pd-g-wink .pd-eR { animation: pd-wink 1.6s ease-in-out 1 !important; }
+
+@keyframes pd-blink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+@keyframes pd-blink2 { 0%, 38%, 50%, 100% { transform: scaleY(1); } 44% { transform: scaleY(.1); } }
+@keyframes pd-bob { 0%, 100% { transform: translateY(0) rotateZ(-4deg) rotateY(-8deg); } 25% { transform: translateY(-34px) rotateZ(0) rotateY(0); } 50% { transform: translateY(0) rotateX(7deg) rotateZ(4deg) rotateY(8deg); } 75% { transform: translateY(-34px) rotateZ(0) rotateY(0); } }
+@keyframes pd-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+@keyframes pd-snore { 0%, 100% { transform: rotateX(0) translateY(0); } 50% { transform: rotateX(5deg) translateY(8px); } }
+@keyframes pd-scan { 0%, 100% { transform: translateX(-22px); } 50% { transform: translateX(22px); } }
+@keyframes pd-ring { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(1.5); opacity: 0; } }
+@keyframes pd-note { 0% { transform: translate(0, 10px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(8px, -120px); opacity: 0; } }
+@keyframes pd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@keyframes pd-snip { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(14deg); } }
+@keyframes pd-dot { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(-24px); opacity: 1; } }
+@keyframes pd-zz { 0% { transform: translate(0, 0); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(14px, -40px); opacity: 0; } }
+@keyframes pd-fall { 0% { transform: translateY(-20px) rotate(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(520px) rotate(360deg); opacity: 0; } }
+@keyframes pd-hide { 0%, 100% { opacity: 1; } 8%, 88% { opacity: 0; } }
+@keyframes pd-show { 0%, 100% { opacity: 0; } 8%, 88% { opacity: 1; } }
+@keyframes pd-hello { 0% { transform: rotateY(-42deg) rotateZ(-6deg) translateY(0); } 40% { transform: rotateY(0) rotateZ(0) translateY(0) scaleY(.92); } 55% { transform: translateY(-190px) scaleY(1.07); } 75% { transform: translateY(0) scaleY(.9); } 100% { transform: translateY(0) scaleY(1); } }
+@keyframes pd-nod { 0%, 100% { transform: rotateX(0) translateY(0); } 16%, 48%, 80% { transform: rotateX(17deg) translateY(12px); } 32%, 64% { transform: rotateX(0) translateY(0); } }
+@keyframes pd-browbody { 0%, 100% { transform: rotateZ(0) rotateY(0) rotateX(0); } 18%, 78% { transform: rotateZ(9deg) rotateY(15deg) rotateX(-4deg); } }
+@keyframes pd-browR { 0%, 100% { opacity: 0; transform: translateY(0) rotate(0); } 20%, 76% { opacity: 1; transform: translateY(-40px) rotate(-12deg); } }
+@keyframes pd-squint { 0%, 100% { transform: scaleY(1); } 18%, 78% { transform: scaleY(.65); } }
+@keyframes pd-look { 0%, 100% { transform: translateX(0); } 18%, 78% { transform: translateX(22px); } }
+@keyframes pd-pop { 0%, 22% { opacity: 0; transform: scale(0) rotate(-16deg); } 36% { opacity: 1; transform: scale(1.15) rotate(8deg); } 44%, 78% { opacity: 1; transform: scale(1) rotate(8deg); } 100% { opacity: 0; transform: scale(1) rotate(8deg); } }
+@keyframes pd-winkbody { 0%, 100% { transform: rotateZ(0) translateY(0); } 20% { transform: rotateZ(8deg) translateY(-26px); } 70% { transform: rotateZ(8deg) translateY(0); } }
+@keyframes pd-wink { 0%, 100% { transform: scaleY(1); } 25%, 75% { transform: scaleY(.1); } }
+
+@media (prefers-reduced-motion: reduce) { .pd * { animation: none !important; } }
+
+/* arıyor: gözler büyüteci takip eder, üç nokta zıplar */
+.pd-m-searching .pd-eo, .pd-m-searching .pd-po { opacity: 1; }
+.pd-m-searching .pd-po { animation: pd-scan 2.4s ease-in-out infinite; }
+.pd-m-searching .pd-dots { opacity: 1; }
+.pd-m-searching .pd-dots i { animation: pd-dot 1s ease-in-out infinite; }
+.pd-mag { left: 290px; top: 240px; width: 170px; height: 170px; }
+.pd-mag i { position: absolute; inset: 0; box-sizing: border-box; border: 18px solid #e9efe7; border-radius: 50%; background: rgba(196, 255, 0, .14); }
+.pd-mag b { position: absolute; left: 142px; top: 142px; width: 20px; height: 100px; border-radius: 10px; background: #e9efe7; transform: rotate(-45deg); transform-origin: 10px 0; }
+.pd-m-searching .pd-mag { opacity: 1; animation: pd-search 2.4s ease-in-out infinite; }
+@keyframes pd-search { 0%, 100% { transform: translate(-110px, -50px) rotate(-8deg); } 50% { transform: translate(130px, 30px) rotate(10deg); } }

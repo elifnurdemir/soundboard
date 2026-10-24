@@ -168,6 +168,7 @@ const useSoundStore = create((set, get) => ({
       cooldown: data.cooldown ?? 0,
       overlap: data.overlap ?? true,
       chatCommand: data.chatCommand || '',
+      credit: data.credit || null, // çevrimiçi kaynaktan geldiyse yazar/lisans/kaynak bilgisi
       createdAt: Date.now(),
     };
     set((state) => ({ sounds: [...state.sounds, s] }));
