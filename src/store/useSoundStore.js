@@ -266,7 +266,7 @@ const useSoundStore = create((set, get) => ({
     }
 
     const url = buildAudioUrl(sound.filePath);
-    const targetVol = Math.min(1, (sound.volume ?? 0.8) * (settings.globalVolume ?? 1));
+    const targetVol = Math.min(5, (sound.volume ?? 0.8) * (settings.globalVolume ?? 1));
 
     // Pro-only effects — only applied for licensed users, even if a stale/tampered-with
     // sound record on disk carries non-default values (defense in depth, not just hiding the UI).
@@ -379,7 +379,7 @@ const useSoundStore = create((set, get) => ({
   updatePlayingVolume: (soundId, volume) => {
     const { playingSounds, settings } = get();
     const instances = playingSounds[soundId] || [];
-    const v = Math.min(1, volume * (settings.globalVolume ?? 1));
+    const v = Math.min(5, volume * (settings.globalVolume ?? 1));
     instances.forEach(({ voice }) => voice.setVolume(v));
   },
 
@@ -403,7 +403,7 @@ const useSoundStore = create((set, get) => ({
       sounds.forEach((s) => {
         const instances = playingSounds[s.id] || [];
         instances.forEach(({ voice }) => {
-          voice.setVolume(Math.min(1, (s.volume ?? 0.8) * updates.globalVolume));
+          voice.setVolume(Math.min(5, (s.volume ?? 0.8) * updates.globalVolume));
         });
       });
     }

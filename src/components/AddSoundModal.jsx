@@ -554,6 +554,16 @@ export default function AddSoundModal() {
                         trimEnd={trimEnd}
                         color={color}
                         onChange={({ trimStart: ts, trimEnd: te }) => { setTrimStart(ts); setTrimEnd(te); }}
+                        fx={{ volume, bass, treble, reverb, fadeIn, fadeOut, rate: playbackRate }}
+                        onFx={(p) => {
+                          if ('volume' in p) setVolume(p.volume);
+                          if ('bass' in p) setBass(p.bass);
+                          if ('treble' in p) setTreble(p.treble);
+                          if ('reverb' in p) setReverb(p.reverb);
+                          if ('fadeIn' in p) setFadeIn(p.fadeIn);
+                          if ('fadeOut' in p) setFadeOut(p.fadeOut);
+                          if ('rate' in p) setPlaybackRate(p.rate);
+                        }}
                       />
                     </div>
                   )}
@@ -659,7 +669,7 @@ export default function AddSoundModal() {
                     <span className="font-mono" style={{ color: 'var(--accent)' }}>{Math.round(volume * 100)}%</span>
                   </label>
                   <input
-                    type="range" min="0" max="1" step="0.01"
+                    type="range" min="0" max="5" step="0.01"
                     value={volume} onChange={(e) => setVolume(Number.parseFloat(e.target.value))}
                     className="w-full volume-slider"
                   />

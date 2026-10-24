@@ -99,6 +99,10 @@ export default function App() {
       );
       window.electronAPI.offShortcutTriggered();
       window.electronAPI.onShortcutTriggered((soundId) => {
+        // Yazı yazarken ya da Ses Ekle penceresi açıkken (kırpma editöründe Boşluk çal/durdur) kısayol sesleri tetiklenmesin
+        const el = document.activeElement;
+        const typing = !!el && (el.tagName === 'TEXTAREA' || el.isContentEditable || (el.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'submit'].includes(el.type)));
+        if (typing || (useSoundStore.getState().isAddModalOpen && document.hasFocus())) return;
         const sound = useSoundStore.getState().sounds.find((s) => s.id === soundId);
         if (!sound) return;
         const isPlaying = !!(useSoundStore.getState().playingSounds[sound.id]?.length);

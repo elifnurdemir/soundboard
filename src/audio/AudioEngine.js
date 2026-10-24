@@ -18,6 +18,7 @@ class Voice {
     this._engine = engine;
     this._n = nodes;
     this._startedAt = meta.startedAt;
+    this._rate = meta.rate || 1;
     this._playDuration = meta.playDuration; // wall-clock seconds, Infinity when looping
     this._onEnded = meta.onEnded;
     this._done = false;
@@ -32,6 +33,20 @@ class Voice {
     const g = this._n.volume.gain;
     g.cancelScheduledValues(0);
     g.setValueAtTime(Math.max(0, v), this._engine.ctx.currentTime);
+  }
+
+  /** Canlı efekt ayarı (kırpma editörü önizlemesinde sürgüler oynarken). */
+  setFx({ bass, treble, reverb }) {
+    if (this._done) return;
+    const t = this._engine.ctx.currentTime;
+    if (bass != null) this._n.bass.gain.setTargetAtTime(bass, t, 0.01);
+    if (treble != null) this._n.treble.gain.setTargetAtTime(treble, t, 0.01);
+    if (reverb != null) this._n.send.gain.setTargetAtTime(Math.min(1, Math.max(0, reverb)) * 0.7, t, 0.01);
+  }
+
+  /** Başlangıçtan beri geçen süre (buffer saniyesi, hız dahil). */
+  elapsed() {
+    return Math.max(0, (this._engine.ctx.currentTime - this._startedAt) * this._rate);
   }
 
   /** Immediate stop. Does not fire onEnded (caller handles its own bookkeeping). */
@@ -87,11 +102,19 @@ class AudioEngine {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     this.ctx = ctx;
 
+    // Sınırlayıcı (limiter): %500'e çıkan ses patlamasın, tepeler yumuşakça kısılsın
+    const makeLimiter = () => {
+      const c = ctx.createDynamicsCompressor();
+      c.threshold.value = -2; c.knee.value = 0; c.ratio.value = 20; c.attack.value = 0.002; c.release.value = 0.12;
+      return c;
+    };
     this.out = ctx.createGain();
-    this.out.connect(ctx.destination);
+    this.limiter = makeLimiter();
+    this.out.connect(this.limiter);
+    this.limiter.connect(ctx.destination);
 
     this.cableDest = ctx.createMediaStreamDestination();
-    this.out.connect(this.cableDest);
+    this.limiter.connect(this.cableDest);
 
     // Shared reverb bus (voices only send into it when reverb > 0)
     const convolver = ctx.createConvolver();
@@ -99,6 +122,17 @@ class AudioEngine {
     this.reverbIn = ctx.createGain();
     this.reverbIn.connect(convolver);
     convolver.connect(this.out);
+
+    // Yerel yol: yalnızca hoparlöre gider, sanal kabloya (arkadaşlara) geçmez. Kırpma editörü önizlemesi için.
+    this.localOut = ctx.createGain();
+    const localLimiter = makeLimiter();
+    this.localOut.connect(localLimiter);
+    localLimiter.connect(ctx.destination);
+    const localConv = ctx.createConvolver();
+    localConv.buffer = this._makeImpulse(ctx, 2.2, 3);
+    this.localReverbIn = ctx.createGain();
+    this.localReverbIn.connect(localConv);
+    localConv.connect(this.localOut);
 
     if (this.cableDeviceId) this._attachCable();
     return ctx;
@@ -230,12 +264,14 @@ class AudioEngine {
     const {
       volume = 1, loop = false, rate = 1, trimStart = 0, trimEnd = null,
       fadeIn = 0, fadeOut = 0, bass = 0, treble = 0, reverb = 0, onEnded,
+      local = false, // yalnızca hoparlöre (kabloya gitmez)
+      range = false, // true: tam dosya bellekte kalır, kırpma ofsetle uygulanır (düzenleme sırasında sınırlar sık değişir)
     } = opts;
     // Kırpma buffer'ın kendisine uygulanır (hazırlanırken kesilir): çalma baştan sona, döngü de kırpılan kısımda döner
-    const buffer = await this._prepare(url, trimStart, trimEnd);
-    const hasTrim = false;
-    const start = 0;
-    const end = buffer.duration;
+    const buffer = await this._prepare(url, range ? 0 : trimStart, range ? null : trimEnd);
+    const hasTrim = range && (trimStart > 0 || trimEnd != null);
+    const start = range ? Math.min(Math.max(0, trimStart), Math.max(0, buffer.duration - 0.01)) : 0;
+    const end = range ? Math.min(buffer.duration, trimEnd != null ? trimEnd : buffer.duration) : buffer.duration;
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -262,9 +298,9 @@ class AudioEngine {
     bassNode.connect(trebleNode);
     trebleNode.connect(volumeNode);
     volumeNode.connect(fadeNode);
-    fadeNode.connect(this.out);
+    fadeNode.connect(local ? this.localOut : this.out);
     fadeNode.connect(send);
-    send.connect(this.reverbIn);
+    send.connect(local ? this.localReverbIn : this.reverbIn);
 
     const t0 = ctx.currentTime + 0.01;
     const looping = loop;
@@ -301,7 +337,7 @@ class AudioEngine {
     return new Voice(
       this,
       { source, bass: bassNode, treble: trebleNode, volume: volumeNode, fade: fadeNode, send },
-      { startedAt: t0, playDuration, onEnded },
+      { startedAt: t0, playDuration, onEnded, rate },
     );
   }
 }

@@ -132,7 +132,7 @@ export default function SoundButton({ sound }) {
     updateSound(sound.id, { volume: vol });
     const instances = playingSounds[sound.id] || [];
     const gv = useSoundStore.getState().settings.globalVolume ?? 1;
-    instances.forEach(({ voice }) => voice.setVolume(Math.min(1, vol * gv)));
+    instances.forEach(({ voice }) => voice.setVolume(Math.min(5, vol * gv)));
   };
 
   const { r, g, b } = hexToRgb(displayColor || '#c4ff00');
@@ -257,13 +257,13 @@ export default function SoundButton({ sound }) {
                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
               </svg>}
               <input
-                type="range" min="0" max="1" step="0.02"
+                type="range" min="0" max="5" step="0.05"
                 value={sound.volume ?? 0.8}
                 onChange={handleVolumeChange}
                 className="no-play flex-1 min-w-0 volume-slider"
               />
               {level !== 'xs' && (
-                <span className="text-white text-[9px] w-5 shrink-0 text-right opacity-60 font-mono">
+                <span className="text-white text-[9px] w-6 shrink-0 text-right opacity-60 font-mono">
                   {Math.round((sound.volume ?? 0.8) * 100)}
                 </span>
               )}

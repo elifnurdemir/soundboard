@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { audioEngine } from '../audio/AudioEngine';
 
 function toUrl(filePath) {
   if (/^(blob:|data:|https?:|file:)/.test(filePath)) return filePath;
@@ -112,11 +113,53 @@ function ToolBtn({ children, onClick, title, active }) {
   );
 }
 
+const FX_DEFAULT = { volume: 0.8, bass: 0, treble: 0, reverb: 0, fadeIn: 0, fadeOut: 0, rate: 1 };
+const FX_ROWS = [
+  { key: 'volume', label: 'Ses seviyesi', min: 0, max: 5, step: 0.05, show: (v) => `%${Math.round(v * 100)}` },
+  { key: 'bass', label: 'Bas', min: -12, max: 12, step: 1, show: (v) => (v === 0 ? 'kapalı' : `${v > 0 ? '+' : ''}${v} dB`) },
+  { key: 'treble', label: 'Tiz', min: -12, max: 12, step: 1, show: (v) => (v === 0 ? 'kapalı' : `${v > 0 ? '+' : ''}${v} dB`) },
+  { key: 'reverb', label: 'Yankı', min: 0, max: 1, step: 0.05, show: (v) => (v === 0 ? 'kapalı' : `%${Math.round(v * 100)}`) },
+  { key: 'fadeIn', label: 'Belirme', min: 0, max: 5, step: 0.1, show: (v) => (v === 0 ? 'kapalı' : `${v.toFixed(1)} sn`) },
+  { key: 'fadeOut', label: 'Sönme', min: 0, max: 5, step: 0.1, show: (v) => (v === 0 ? 'kapalı' : `${v.toFixed(1)} sn`) },
+  { key: 'rate', label: 'Hız / perde', min: 0.5, max: 2, step: 0.05, show: (v) => (v === 1 ? 'normal' : `${v.toFixed(2)}x`) },
+];
+
+/** Ses seviyesi (%500'e kadar) ve efektler: önizlemede canlı duyulur, değerler Ses Ekle penceresiyle ortaktır. */
+function FxPanel({ fx, onFx }) {
+  return (
+    <div className="border border-app-border bg-app-input p-3 space-y-2">
+      <div className="grid gap-x-5 gap-y-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
+        {FX_ROWS.map((r) => (
+          <label key={r.key} className="block">
+            <span className="flex justify-between text-[10px] font-mono mb-1" style={{ color: '#8e9c8b' }}>
+              <span>{r.label}</span>
+              <span style={{ color: 'var(--accent)' }}>{r.show(fx[r.key])}</span>
+            </span>
+            <input
+              type="range" min={r.min} max={r.max} step={r.step} value={fx[r.key]}
+              onChange={(e) => onFx({ [r.key]: Number.parseFloat(e.target.value) })}
+              className="w-full volume-slider"
+              aria-label={r.label}
+            />
+          </label>
+        ))}
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[9px] font-mono" style={{ color: '#5c665a' }}>
+          %100 üstü sesler sınırlayıcıdan geçer, patlama olmaz. Önizleme yalnızca senin hoparlöründen çıkar.
+        </p>
+        <ToolBtn onClick={() => onFx(FX_DEFAULT)} title="Ses ve efektleri varsayılana döndür">SIFIRLA</ToolBtn>
+      </div>
+    </div>
+  );
+}
+
 /** Dalga formu + tutamaçlar + kaydırma çubuğu + araç çubuğu. Hem satır içi hem büyük görünümde kullanılır. */
 function WaveEditor({
   data, view, setView, trimStart, effectiveEnd, onSelect, color, height,
-  previewing, playheadTime, togglePreview, expanded, onToggleExpand,
+  previewing, playheadTime, togglePreview, expanded, onToggleExpand, fx, onFx,
 }) {
+  const [fxOpen, setFxOpen] = useState(expanded);
   const duration = data.duration;
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
@@ -346,11 +389,14 @@ function WaveEditor({
           SEÇİME SIĞDIR
         </ToolBtn>
         <ToolBtn onClick={() => setView({ start: 0, end: duration })} title="Tüm dosyayı göster" active={!zoomed}>TÜMÜ</ToolBtn>
+        {onFx && <ToolBtn onClick={() => setFxOpen((v) => !v)} title="Ses seviyesi (%500'e kadar) ve efektler" active={fxOpen}>{fxOpen ? '▾' : '▸'} SES VE EFEKTLER</ToolBtn>}
         <div className="flex-1" />
         <ToolBtn onClick={onToggleExpand} title={expanded ? 'Küçült' : 'Büyük pencerede aç'}>
           {expanded ? '✕ KÜÇÜLT' : '⤢ BÜYÜT'}
         </ToolBtn>
       </div>
+
+      {onFx && fxOpen && <FxPanel fx={fx} onFx={onFx} />}
 
       {/* Dalga */}
       <div
@@ -393,7 +439,7 @@ function WaveEditor({
         </span>
       </div>
       <p className="text-[9px] font-mono" style={{ color: '#3c4238' }}>
-        Sürükle: bölge seç · Tekerlek: yakınlaştır · Shift+tekerlek: kaydır · Sarı çizgiler: ince ayar
+        Boşluk: çal / durdur · Sürükle: bölge seç · Tekerlek: yakınlaştır · Shift+tekerlek: kaydır · Sarı çizgiler: ince ayar
       </p>
     </div>
   );
@@ -403,7 +449,8 @@ function WaveEditor({
  * Non-destructive trim editörü. Dosyayı değiştirmez —
  * sadece trimStart/trimEnd (saniye) üretir, çalma sırasında uygulanır.
  */
-export default function AudioTrimEditor({ filePath, trimStart = 0, trimEnd = null, onChange, color = '#c4ff00' }) {
+export default function AudioTrimEditor({ filePath, trimStart = 0, trimEnd = null, onChange, color = '#c4ff00', fx: fxProp, onFx }) {
+  const fx = { ...FX_DEFAULT, ...(fxProp || {}) };
   const [data, setData] = useState(null); // { channel, sr, duration, buckets }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -419,8 +466,9 @@ export default function AudioTrimEditor({ filePath, trimStart = 0, trimEnd = nul
   const [playheadTime, setPlayheadTime] = useState(null);
 
   const ctxRef = useRef(null);
-  const previewAudioRef = useRef(null);
+  const voiceRef = useRef(null);
   const rafRef = useRef(null);
+  const toggleRef = useRef(null);
 
   useEffect(() => {
     if (!filePath) { setData(null); return; }
@@ -457,10 +505,10 @@ export default function AudioTrimEditor({ filePath, trimStart = 0, trimEnd = nul
 
   const stopPreview = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
-    if (previewAudioRef.current) {
-      previewAudioRef.current.pause();
-      previewAudioRef.current.src = '';
-      previewAudioRef.current = null;
+    if (voiceRef.current) {
+      const v = voiceRef.current;
+      voiceRef.current = null;
+      v.stop();
     }
     setPreviewing(false);
     setPlayheadTime(null);
@@ -478,21 +526,57 @@ export default function AudioTrimEditor({ filePath, trimStart = 0, trimEnd = nul
     onChange({ trimStart: s, trimEnd: e >= duration - 0.005 ? null : e });
   };
 
-  const togglePreview = () => {
-    if (previewing) { stopPreview(); return; }
-    const audio = new Audio(toUrl(filePath));
-    previewAudioRef.current = audio;
-    audio.currentTime = trimStart;
-    const tick = () => {
-      if (!previewAudioRef.current) return;
-      setPlayheadTime(audio.currentTime);
-      if (audio.currentTime >= effectiveEnd) { stopPreview(); return; }
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    audio.addEventListener('ended', stopPreview);
-    audio.play().then(() => { rafRef.current = requestAnimationFrame(tick); }).catch(stopPreview);
+  // Önizleme ana ses motorundan çalar (yalnızca hoparlör): ses seviyesi %500'e kadar ve efektler duyulur
+  const togglePreview = async () => {
+    if (voiceRef.current) { stopPreview(); return; }
+    if (!filePath || !data) return;
     setPreviewing(true);
+    try {
+      const voice = await audioEngine.play(toUrl(filePath), {
+        local: true, range: true,
+        volume: fx.volume, rate: fx.rate, bass: fx.bass, treble: fx.treble, reverb: fx.reverb, fadeIn: fx.fadeIn, fadeOut: fx.fadeOut,
+        trimStart, trimEnd: effectiveEnd >= duration - 0.005 ? null : effectiveEnd,
+        onEnded: () => { if (voiceRef.current === voice) stopPreview(); },
+      });
+      voiceRef.current = voice;
+      const tick = () => {
+        if (voiceRef.current !== voice) return;
+        setPlayheadTime(trimStart + voice.elapsed());
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch (_) {
+      stopPreview();
+    }
   };
+  toggleRef.current = togglePreview;
+
+  // Sürgüler oynarken önizleme canlı değişsin
+  useEffect(() => {
+    const v = voiceRef.current;
+    if (!v) return;
+    v.setVolume(fx.volume);
+    v.setFx({ bass: fx.bass, treble: fx.treble, reverb: fx.reverb });
+  }, [fx.volume, fx.bass, fx.treble, fx.reverb]);
+
+  // Boşluk tuşu her zaman çal / durdur (yazı alanlarında boşluk yazılır; sürgü ve düğmeler boşluğu yutmaz)
+  useEffect(() => {
+    const isTyping = (t) => !!t && (t.tagName === 'TEXTAREA' || t.isContentEditable
+      || (t.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'submit'].includes(t.type)));
+    const onDown = (e) => {
+      if (e.code !== 'Space' && e.key !== ' ') return;
+      if (isTyping(e.target) || !toggleRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!e.repeat) toggleRef.current();
+    };
+    const onUp = (e) => {
+      if ((e.code === 'Space' || e.key === ' ') && !isTyping(e.target)) e.preventDefault(); // odaktaki düğme boşlukla tıklanmasın
+    };
+    window.addEventListener('keydown', onDown, true);
+    window.addEventListener('keyup', onUp, true);
+    return () => { window.removeEventListener('keydown', onDown, true); window.removeEventListener('keyup', onUp, true); };
+  }, []);
 
   // Büyük görünüm: Escape sadece onu kapatsın (arkadaki modal kapanmasın)
   useEffect(() => {
@@ -521,7 +605,7 @@ export default function AudioTrimEditor({ filePath, trimStart = 0, trimEnd = nul
 
   const shared = {
     data, view, setView, trimStart, effectiveEnd, onSelect: applySelection, color,
-    previewing, playheadTime, togglePreview,
+    previewing, playheadTime, togglePreview, fx, onFx,
   };
 
   if (expanded) {
