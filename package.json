@@ -86,6 +86,15 @@
     "linux": {
       "icon": "build-assets/icon-1024.png",
       "category": "Utility",
+      "extraResources": [
+        {
+          "from": "electron/bin",
+          "to": "bin",
+          "filter": [
+            "yt-dlp"
+          ]
+        }
+      ],
       "target": [
         {
           "target": "AppImage"

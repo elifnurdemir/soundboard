@@ -2,18 +2,20 @@ const path = require('path');
 const fs = require('fs');
 const YTDlpWrap = require('yt-dlp-wrap-plus').default;
 
+// Windows: yt-dlp.exe, Linux/macOS: yt-dlp (çalıştırılabilir izniyle)
+const fileName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
 const destDir = path.join(__dirname, '..', 'electron', 'bin');
-const destPath = path.join(destDir, 'yt-dlp.exe');
+const destPath = path.join(destDir, fileName);
 
 async function main() {
   if (fs.existsSync(destPath)) {
-    console.log('yt-dlp.exe zaten mevcut, atlanıyor:', destPath);
+    console.log(fileName + ' zaten mevcut, atlanıyor:', destPath);
     return;
   }
   fs.mkdirSync(destDir, { recursive: true });
-  console.log('yt-dlp.exe indiriliyor...');
-  await YTDlpWrap.downloadFromGithub(destPath, undefined, 'win32');
-  console.log('yt-dlp.exe indirildi:', destPath);
+  console.log(fileName + ' indiriliyor...');
+  await YTDlpWrap.downloadFromGithub(destPath, undefined, process.platform);
+  console.log(fileName + ' indirildi:', destPath);
 }
 
 main().catch((err) => {

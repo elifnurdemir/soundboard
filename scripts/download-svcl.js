@@ -27,6 +27,7 @@ function download(url, redirectsLeft = 5) {
 }
 
 async function main() {
+  if (process.platform !== 'win32') { console.log('svcl yalnızca Windows için, atlanıyor.'); return; }
   const marker = path.join(destDir, '.installed');
   if (fs.existsSync(marker)) {
     console.log('svcl zaten mevcut, atlanıyor:', destDir);

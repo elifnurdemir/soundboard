@@ -7,8 +7,14 @@ const fs = require('node:fs');
 const zlib = require('node:zlib');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
+// Linux: sanal mikrofon ve uygulama başına yönlendirme PulseAudio/PipeWire (pactl) ile
+const linuxAudio = process.platform === 'linux' ? require('./linuxAudio') : null;
 
 const isDev = !app.isPackaged;
+
+// AppImage'ta Chromium sandbox'ı, kullanıcı alanı izolasyonunu kapatan dağıtımlarda (ör. Ubuntu 24.04) açılmayı engeller.
+// Uygulama yalnızca kendi yerel arayüzünü yükler; sandbox'ı sadece AppImage için kapatıyoruz.
+if (process.platform === 'linux' && process.env.APPIMAGE) app.commandLine.appendSwitch('no-sandbox');
 
 // Register custom protocol BEFORE app is ready
 protocol.registerSchemesAsPrivileged([
@@ -173,6 +179,10 @@ app.whenReady().then(() => {
   const reportCleaned = (cleaned) => {
     if (cleaned.length) console.log('Stray CABLE routing restored for:', cleaned.join(', '));
   };
+  // Linux: sanal mikrofon daha önce kurulduysa her açılışta yeniden kur (modüller yeniden başlatmada kaybolur)
+  if (linuxAudio && fs.existsSync(path.join(app.getPath('userData'), 'linux-virtual-mic'))) {
+    linuxAudio.ensure().then((r) => { if (!r.success) console.error('Sanal mikrofon kurulamadı:', r.error); });
+  }
   cleanupStaleCableRouting().then(reportCleaned);
   setInterval(() => {
     const excludeExes = new Set(Object.keys(routedAppsSnapshot).map((e) => e.toLowerCase()));
@@ -498,10 +508,12 @@ ipcMain.handle('save-recording', async (_, arrayBuffer, ext) => {
 // ─── YouTube Audio Download ───────────────────────────────────────────────────
 const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)/i;
 
+const YTDLP_FILE = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+
 function getYtDlpPath() {
   return app.isPackaged
-    ? path.join(process.resourcesPath, 'bin', 'yt-dlp.exe')
-    : path.join(__dirname, 'bin', 'yt-dlp.exe');
+    ? path.join(process.resourcesPath, 'bin', YTDLP_FILE)
+    : path.join(__dirname, 'bin', YTDLP_FILE);
 }
 
 ipcMain.handle('download-youtube-audio', async (_, url) => {
@@ -570,6 +582,16 @@ function getVbCablePath() {
 ipcMain.handle('install-virtual-cable', async () => {
   const proError = requireProOrError();
   if (proError) return proError;
+
+  if (linuxAudio) {
+    const res = await linuxAudio.ensure();
+    if (res.success) {
+      try { fs.writeFileSync(path.join(app.getPath('userData'), 'linux-virtual-mic'), '1'); } catch (_) { /* işaret dosyası yazılamazsa her açılışta sorulmaz, sadece otomatik kurulum olmaz */ }
+      return { success: true, rebootRequired: false };
+    }
+    return res;
+  }
+  if (process.platform !== 'win32') return { success: false, error: 'Sanal kablo kurulumu bu sistemde desteklenmiyor.' };
 
   const vbCablePath = getVbCablePath();
   if (!fs.existsSync(vbCablePath)) {
@@ -700,6 +722,8 @@ function findSystemDefaultRenderDeviceId(rows) {
 // open. `excludeExes` lets the periodic sweep skip apps the user is intentionally routing
 // *right now* in this session — the manual "SIFIRLA" button passes no exclusions (resets everything).
 async function cleanupStaleCableRouting(excludeExes = new Set()) {
+  if (linuxAudio) return linuxAudio.cleanup(excludeExes);
+  if (process.platform !== 'win32') return [];
   try {
     if (!fs.existsSync(getSvclPath())) return [];
     const rows = await runSvclExport();
@@ -733,6 +757,9 @@ async function cleanupStaleCableRouting(excludeExes = new Set()) {
 ipcMain.handle('reset-all-app-routing', async () => ({ success: true, cleaned: await cleanupStaleCableRouting() }));
 
 ipcMain.handle('list-audio-sessions', async () => {
+  if (linuxAudio) {
+    try { return { success: true, apps: await linuxAudio.listSessions() }; } catch (err) { return { success: false, error: err.message }; }
+  }
   try {
     const rows = await runSvclExport();
     const seen = new Set();
@@ -756,6 +783,7 @@ ipcMain.handle('route-app-to-cable', async (_, exeName) => {
   const proError = requireProOrError();
   if (proError) return proError;
 
+  if (linuxAudio) return linuxAudio.routeApp(exeName).catch((err) => ({ success: false, error: err.message }));
   if (VOICE_APP_BLOCKLIST.has((exeName || '').toLowerCase())) {
     return { success: false, error: 'Bu uygulama, sesin geri yankılanmasını önlemek için yönlendirilemez.' };
   }
@@ -774,12 +802,15 @@ ipcMain.handle('route-app-to-cable', async (_, exeName) => {
 ipcMain.handle('restore-app-device', async (_, exeName, deviceId) => {
   if (!deviceId) return { success: false, error: 'Önceki cihaz bilgisi yok.' };
   try {
-    await runSvclSetAppDefault(deviceId, exeName);
+    await restoreRoute(exeName, deviceId);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
   }
 });
+
+// Bir uygulamayı önceki çıkış aygıtına geri döndürür (Windows: svcl, Linux: pactl)
+const restoreRoute = (exeName, deviceId) => (linuxAudio ? linuxAudio.restoreApp(exeName, deviceId) : runSvclSetAppDefault(deviceId, exeName));
 
 // Renderer keeps main in sync with which apps are currently routed to CABLE, so we can
 // restore them even if the window/renderer isn't around to run cleanup JS at quit time.
@@ -794,7 +825,7 @@ app.on('before-quit', (e) => {
   restoringRoutedAppsOnQuit = true;
   (async () => {
     for (const [exeName, deviceId] of entries) {
-      try { await runSvclSetAppDefault(deviceId, exeName); } catch (_) { /* best-effort */ }
+      try { await restoreRoute(exeName, deviceId); } catch (_) { /* best-effort */ }
     }
     routedAppsSnapshot = {};
     app.quit();

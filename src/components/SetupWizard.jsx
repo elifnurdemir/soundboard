@@ -9,7 +9,11 @@ import Pado from './Pado';
 // İlk kurulum: sanal kablo → test sesi → uygulamada mikrofon seçimi → bitti.
 // Mikrofon adımı, hangi uygulamada neye basılacağını küçük bir ayar penceresi çizimiyle gösterir.
 
-const CABLE_OUT = 'CABLE Output (VB-Audio Virtual Cable)';
+const PLATFORM = window.electronAPI?.platform;
+const isLinux = PLATFORM === 'linux';
+// Sanal mikrofonun uygulamalarda görünen adı
+const CABLE_OUT = isLinux ? 'Padoboard Mikrofon' : 'CABLE Output (VB-Audio Virtual Cable)';
+const MIC_SHORT = isLinux ? 'Padoboard Mikrofon' : 'CABLE Output';
 
 const APPS = [
   {
@@ -25,12 +29,12 @@ const APPS = [
   {
     id: 'game', name: 'Oyunlar',
     path: ['Oyun ayarları', 'Ses / Sesli sohbet', 'Giriş (Mikrofon) aygıtı'],
-    tip: 'Oyun "Varsayılan aygıt" kullanıyorsa Windows Ses ayarlarından Kayıt aygıtını CABLE Output yap.',
+    tip: isLinux ? 'Oyun varsayılan mikrofonu kullanıyorsa, sistem ses ayarlarından (ya da pavucontrol\'dan) varsayılan giriş aygıtını Padoboard Mikrofon yap.' : 'Oyun "Varsayılan aygıt" kullanıyorsa Windows Ses ayarlarından Kayıt aygıtını CABLE Output yap.',
   },
   {
     id: 'obs', name: 'OBS / yayın',
     path: ['Ayarlar', 'Ses', 'Mic/Aux Ses'],
-    tip: 'OBS\'te CABLE Output\'u "Ses Giriş Yakalama" kaynağı olarak da ekleyebilirsin.',
+    tip: isLinux ? 'OBS\'te Padoboard Mikrofon\'u "Ses Giriş Yakalama" kaynağı olarak da ekleyebilirsin.' : 'OBS\'te CABLE Output\'u "Ses Giriş Yakalama" kaynağı olarak da ekleyebilirsin.',
   },
 ];
 
@@ -83,7 +87,7 @@ function MicMock({ app }) {
   );
 }
 
-const STEPS = ['Merhaba', 'Sanal kablo', 'Test', 'Mikrofon', 'Bitti'];
+const STEPS = ['Merhaba', isLinux ? 'Sanal mikrofon' : 'Sanal kablo', 'Test', 'Mikrofon', 'Bitti'];
 
 export default function SetupWizard() {
   const hide = useSetupStore((s) => s.hide);
@@ -105,7 +109,7 @@ export default function SetupWizard() {
     () => outputDevices.some((d) => VoiceChatRouter.isVirtualCableLabel(d.label)),
     [outputDevices],
   );
-  const isWin = window.electronAPI?.platform === 'win32';
+  const canInstall = PLATFORM === 'win32' || isLinux;
 
   const finish = () => { updateSettings({ setupDone: true }); hide(); };
 
@@ -120,8 +124,9 @@ export default function SetupWizard() {
     try {
       const res = await window.electronAPI.installVirtualCable();
       setInstallMsg(res.success
-        ? { ok: true, text: 'Kurulum tamamlandı. Bilgisayarı yeniden başlat; sonra rehberi Ses Yönlendirme panelinden tekrar açabilirsin.' }
+        ? { ok: true, text: res.rebootRequired === false ? 'Sanal mikrofon oluşturuldu.' : 'Kurulum tamamlandı. Bilgisayarı yeniden başlat; sonra rehberi Ses Yönlendirme panelinden tekrar açabilirsin.' }
         : { ok: false, text: res.error || 'Kurulum başarısız oldu.' });
+      if (res.success && res.rebootRequired === false) await loadDevices();
     } catch (err) {
       setInstallMsg({ ok: false, text: err.message || 'Kurulum başarısız oldu.' });
     } finally {
@@ -178,14 +183,16 @@ export default function SetupWizard() {
 
           {step === 1 && (
             <div className="space-y-3">
-              <h2 className="text-base font-bold font-mono text-white">Sanal kablo</h2>
+              <h2 className="text-base font-bold font-mono text-white">{isLinux ? 'Sanal mikrofon' : 'Sanal kablo'}</h2>
               <p className="text-sm font-mono" style={{ color: '#8e9c8b' }}>
-                Padoboard'un sesi, Discord'a "mikrofon gibi" gönderebilmesi için sanal bir ses kablosuna ihtiyacı var. Bu iş için VB-CABLE kullanıyoruz.
+                {isLinux
+                  ? 'Padoboard\'un sesi, Discord\'a "mikrofon gibi" gönderebilmesi için sanal bir mikrofon oluşturur (PulseAudio ya da PipeWire). Sürücü, yönetici izni ya da yeniden başlatma gerekmez.'
+                  : 'Padoboard\'un sesi, Discord\'a "mikrofon gibi" gönderebilmesi için sanal bir ses kablosuna ihtiyacı var. Bu iş için VB-CABLE kullanıyoruz.'}
               </p>
               <div className="p-3 border flex items-center gap-3" style={cableFound ? { borderColor: 'rgba(0,255,128,0.4)', background: 'rgba(0,255,128,0.06)' } : { borderColor: '#1e231e', background: '#131713' }}>
                 <span className="text-lg" style={{ color: cableFound ? '#00ff80' : '#5c665a' }} aria-hidden="true">{cableFound ? '✓' : '○'}</span>
                 <div className="text-sm font-mono">
-                  <div className="text-white">{cableFound ? 'Sanal kablo bulundu' : 'Sanal kablo bulunamadı'}</div>
+                  <div className="text-white">{cableFound ? (isLinux ? 'Sanal mikrofon hazır' : 'Sanal kablo bulundu') : (isLinux ? 'Sanal mikrofon yok' : 'Sanal kablo bulunamadı')}</div>
                   <div className="text-[11px]" style={{ color: '#5c665a' }}>
                     {cableFound ? 'Hazır, devam edebilirsin.' : 'Kurmak için aşağıdaki butonu kullan.'}
                   </div>
@@ -193,9 +200,9 @@ export default function SetupWizard() {
               </div>
               {!cableFound && (
                 <div className="space-y-2">
-                  {isWin && (
+                  {canInstall && (
                     <button type="button" onClick={install} disabled={installing} className="btn-accent w-full py-2 text-xs font-bold font-mono tracking-wider disabled:opacity-50">
-                      {installing ? 'KURULUYOR…' : 'OTOMATİK KUR'}
+                      {installing ? 'KURULUYOR…' : (isLinux ? 'SANAL MİKROFON OLUŞTUR' : 'OTOMATİK KUR')}
                     </button>
                   )}
                   <button type="button" onClick={refresh} disabled={refreshing} className="w-full py-2 text-xs font-bold font-mono tracking-wider bg-app-surface border border-app-border text-[#8e9c8b] hover:text-white disabled:opacity-50">
@@ -205,13 +212,17 @@ export default function SetupWizard() {
                     <p className="text-[11px] font-mono" style={{ color: installMsg.ok ? '#00ff80' : '#ff6b6b' }}>{installMsg.text}</p>
                   )}
                   <p className="text-[10px] font-mono" style={{ color: '#5c665a' }}>
-                    Windows kurulum sırasında yönetici izni ve bir sürücü onayı isteyecek. "Yayıncı doğrulanamadı" uyarısı çıkarsa Yine de yükle'ye bas. Kurulumdan sonra bilgisayarı yeniden başlatman gerekir.
+                    {isLinux
+                      ? 'pactl gerekir (pulseaudio-utils paketi, PipeWire kullanıyorsan da). Oturumu kapatınca sanal mikrofon kaybolur, Padoboard açılışta yeniden oluşturur.'
+                      : 'Windows kurulum sırasında yönetici izni ve bir sürücü onayı isteyecek. "Yayıncı doğrulanamadı" uyarısı çıkarsa Yine de yükle\'ye bas. Kurulumdan sonra bilgisayarı yeniden başlatman gerekir.'}
                   </p>
                 </div>
               )}
-              <p className="text-[10px] font-mono pt-2 border-t border-app-border" style={{ color: '#3c4238' }}>
-                VB-CABLE, VB-Audio Software'in bağışla desteklenen (donationware) ürünüdür. vb-cable.com
-              </p>
+              {!isLinux && (
+                <p className="text-[10px] font-mono pt-2 border-t border-app-border" style={{ color: '#3c4238' }}>
+                  VB-CABLE, VB-Audio Software'in bağışla desteklenen (donationware) ürünüdür. vb-cable.com
+                </p>
+              )}
             </div>
           )}
 
@@ -229,12 +240,12 @@ export default function SetupWizard() {
               </div>
               {tested && (
                 <p className="text-[12px] font-mono" style={{ color: '#8e9c8b' }}>
-                  Duymadıysan: Windows'ta çıkış cihazının doğru olduğundan ve ses seviyesinin açık olduğundan emin ol. Sonra tekrar dene.
+                  Duymadıysan: sistem ses ayarlarında çıkış cihazının doğru olduğundan ve ses seviyesinin açık olduğundan emin ol. Sonra tekrar dene.
                 </p>
               )}
               {!virtualDeviceId && cableFound && (
                 <p className="text-[11px] font-mono" style={{ color: '#ff6b6b' }}>
-                  Sanal kablo henüz seçilmedi. Ses Yönlendirme panelinden CABLE Input'u seçebilirsin.
+                  Sanal cihaz henüz seçilmedi. Ses Yönlendirme panelinden {isLinux ? 'Padoboard' : 'CABLE Input'} seçebilirsin.
                 </p>
               )}
             </div>
@@ -244,7 +255,7 @@ export default function SetupWizard() {
             <div className="space-y-3">
               <h2 className="text-base font-bold font-mono text-white">Uygulamada mikrofonu seç</h2>
               <p className="text-sm font-mono" style={{ color: '#8e9c8b' }}>
-                Arkadaşlarının duyması için konuştuğun uygulamada giriş aygıtını <strong style={{ color: 'var(--accent)' }}>CABLE Output</strong> yap.
+                Arkadaşlarının duyması için konuştuğun uygulamada giriş aygıtını <strong style={{ color: 'var(--accent)' }}>{MIC_SHORT}</strong> yap.
               </p>
               <div className="flex gap-1.5 flex-wrap" role="tablist">
                 {APPS.map((a) => (

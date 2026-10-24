@@ -19,6 +19,7 @@ export default function VoiceChatPanel() {
     error,
   } = useVoiceChatStore();
   const room = useRoomStore();
+  const isLinux = window.electronAPI?.platform === 'linux';
   const [copied, setCopied] = useState('');
 
   const [loading, setLoading] = useState(false);
@@ -96,7 +97,12 @@ export default function VoiceChatPanel() {
     try {
       const res = await window.electronAPI.installVirtualCable();
       if (res.success) {
-        setInstallMessage('Kurulum tamamlandı. Bilgisayarını yeniden başlat, sonra buraya dönüp "Cihazları Yenile"ye bas.');
+        if (res.rebootRequired === false) {
+          setInstallMessage('Kurulum tamamlandı. Sanal mikrofon hazır.');
+          loadDevices();
+        } else {
+          setInstallMessage('Kurulum tamamlandı. Bilgisayarını yeniden başlat, sonra buraya dönüp "Cihazları Yenile"ye bas.');
+        }
       } else {
         setInstallMessage(res.error || 'Kurulum başarısız oldu.');
       }
@@ -148,26 +154,26 @@ export default function VoiceChatPanel() {
             <ol className="text-xs font-mono space-y-2" style={{ color: '#8e9c8b' }}>
               <li className="flex gap-2">
                 <span style={{ color: 'var(--accent)' }}>01</span>
-                <span><strong className="text-white">VB-Audio Cable</strong> indirin — vb-audio.com (ücretsiz)</span>
+                <span>{isLinux ? <>Aşağıdan <strong className="text-white">sanal mikrofonu oluşturun</strong></> : <><strong className="text-white">VB-Audio Cable</strong> indirin — vb-audio.com (ücretsiz)</>}</span>
               </li>
               <li className="flex gap-2">
                 <span style={{ color: 'var(--accent)' }}>02</span>
-                <span>Bilgisayarı yeniden başlatın</span>
+                <span>{isLinux ? 'Yeniden başlatma gerekmez' : 'Bilgisayarı yeniden başlatın'}</span>
               </li>
               <li className="flex gap-2">
                 <span style={{ color: 'var(--accent)' }}>03</span>
-                <span>Aşağıdan <strong className="text-white">CABLE Input</strong> seçin</span>
+                <span>Aşağıdan <strong className="text-white">{isLinux ? 'Padoboard' : 'CABLE Input'}</strong> seçin</span>
               </li>
               <li className="flex gap-2">
                 <span style={{ color: 'var(--accent)' }}>04</span>
-                <span>Uygulamada mikrofon olarak <strong className="text-white">CABLE Output</strong> seçin</span>
+                <span>Uygulamada mikrofon olarak <strong className="text-white">{isLinux ? 'Padoboard Mikrofon' : 'CABLE Output'}</strong> seçin</span>
               </li>
             </ol>
             <p className="text-[10px] font-mono pt-2 border-t border-app-border" style={{ color: '#3c4238' }}>
               ✓ Discord · OBS · Zoom · Teams · ses kayıt yazılımları
             </p>
 
-            {window.electronAPI && window.electronAPI.platform === 'win32' && (
+            {window.electronAPI && (window.electronAPI.platform === 'win32' || isLinux) && (
               <ProGate feature="VB-CABLE otomatik kurulum">
                 <div className="pt-2 border-t border-app-border space-y-2">
                   <button
@@ -176,10 +182,10 @@ export default function VoiceChatPanel() {
                     className="w-full py-2 text-[10px] font-bold font-mono tracking-wider bg-app-input border border-app-border hover:border-[rgba(196,255,0,0.3)] disabled:opacity-50 transition-colors"
                     style={{ color: 'var(--accent)' }}
                   >
-                    {installing ? 'KURULUYOR...' : '⚡ OTOMATİK KUR'}
+                    {installing ? 'KURULUYOR...' : (isLinux ? '⚡ SANAL MİKROFON OLUŞTUR' : '⚡ OTOMATİK KUR')}
                   </button>
                   <p className="text-[9px] font-mono" style={{ color: '#3c4238' }}>
-                    VB-CABLE, VB-Audio'nun donationware ürünüdür — vb-cable.com. Kurulum sırasında bir Windows güvenlik onayı çıkacak.
+                    {isLinux ? 'PulseAudio ya da PipeWire üzerinde çalışır (pactl gerekir). Yönetici izni istemez.' : "VB-CABLE, VB-Audio'nun donationware ürünüdür — vb-cable.com. Kurulum sırasında bir Windows güvenlik onayı çıkacak."}
                   </p>
                   {installMessage && (
                     <p className="text-[10px] font-mono" style={{ color: installMessage.startsWith('Kurulum tamamlandı') ? '#00ff80' : '#ff6b6b' }}>
@@ -279,7 +285,7 @@ export default function VoiceChatPanel() {
                     {audioApps.map((a) => {
                       const routed = !!routedApps[a.exe];
                       const busy = routingExe === a.exe;
-                      const buttonLabel = busy ? '...' : (routed ? 'GERİ AL' : "CABLE'A YÖNLENDİR");
+                      const buttonLabel = busy ? '...' : (routed ? 'GERİ AL' : (isLinux ? "PADOBOARD'A YÖNLENDİR" : "CABLE'A YÖNLENDİR"));
                       return (
                         <div key={a.exe} className="flex items-center justify-between gap-2 p-2 bg-app-input border border-app-border">
                           <span className="text-xs font-mono text-white truncate">{a.name}</span>

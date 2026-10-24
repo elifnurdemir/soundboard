@@ -27,6 +27,7 @@ function download(url, redirectsLeft = 5) {
 }
 
 async function main() {
+  if (process.platform !== 'win32') { console.log('VB-CABLE yalnızca Windows için, atlanıyor.'); return; }
   const marker = path.join(destDir, '.installed');
   if (fs.existsSync(marker)) {
     console.log('VB-CABLE zaten mevcut, atlanıyor:', destDir);
