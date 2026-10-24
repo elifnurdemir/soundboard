@@ -994,7 +994,7 @@ export default function CollageStudio() {
       onDragOver={swallow} onDrop={swallow}
     >
       <header className="shrink-0 flex items-center gap-3 px-5 box-border" style={{ height: 56, background: C.panel, borderBottom: `1px solid ${C.border}` }}>
-        <button type="button" onClick={() => S().close()} className="text-sm font-medium" style={{ color: C.muted, background: 'transparent', border: 0 }}>← Soundboard</button>
+        <button type="button" onClick={() => S().close()} className="text-sm font-medium" style={{ color: C.muted, background: 'transparent', border: 0 }}>← Padoboard</button>
         <div style={{ width: 1, height: 24, background: C.line }} />
         <PadoMascot size={44} />
         <input

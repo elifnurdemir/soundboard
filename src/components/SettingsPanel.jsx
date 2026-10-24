@@ -447,7 +447,7 @@ export default function SettingsPanel() {
                 </svg>
               </div>
               <p className="text-sm font-bold font-mono tracking-widest text-white">
-                SOUNDBOARD
+                PADOBOARD
               </p>
               <p className="text-[10px] font-mono text-[#5c665a]">
                 {appVersion ? `v${appVersion}` : 'v—'}
@@ -455,6 +455,10 @@ export default function SettingsPanel() {
               <p className="text-[10px] font-mono text-[#3c4238]">
                 OBS · TWITCH
               </p>
+              <div className="flex justify-center gap-2 pt-2">
+                <button type="button" onClick={() => window.electronAPI?.reportIssue()} className="px-3 py-1.5 text-[11px] font-bold font-mono tracking-wider bg-app-surface border border-app-border text-[#8e9c8b] hover:text-white">SORUN BİLDİR</button>
+                <button type="button" onClick={() => window.electronAPI?.openLogFolder()} className="px-3 py-1.5 text-[11px] font-bold font-mono tracking-wider bg-app-surface border border-app-border text-[#8e9c8b] hover:text-white">GÜNLÜK KLASÖRÜ</button>
+              </div>
             </div>
           </Section>
         </div>

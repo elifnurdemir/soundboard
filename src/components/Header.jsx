@@ -54,7 +54,7 @@ export default function Header() {
             );
           }))}
         </svg>
-        <span className="font-bold text-white text-sm tracking-widest uppercase font-mono">SOUNDBOARD</span>
+        <span className="font-bold text-white text-sm tracking-widest uppercase font-mono">PADOBOARD</span>
       </div>
 
       {/* Search */}

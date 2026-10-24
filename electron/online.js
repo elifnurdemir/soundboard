@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const UA = 'SoundboardApp/1.0 (+https://github.com/elifnurdemir/soundboard)';
+const UA = 'Padoboard/1.0 (+https://github.com/elifnurdemir/soundboard)';
 const API = 'https://api.openverse.org/v1/audio/';
 const CACHE_MS = 10 * 60 * 1000;
 const MAX_CACHE = 60;

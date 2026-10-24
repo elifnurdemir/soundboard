@@ -69,7 +69,7 @@ function loadAppIcon() {
 
 function createTray() {
   tray = new Tray(loadAppIcon());
-  tray.setToolTip('Soundboard');
+  tray.setToolTip('Padoboard');
   const menu = Menu.buildFromTemplate([
     { label: 'Göster / Gizle', click: () => {
       if (!mainWindow) return;
@@ -345,45 +345,18 @@ ipcMain.handle('deactivate-license', async () => {
 
 ipcMain.handle('open-checkout', () => shell.openExternal(LEMONSQUEEZY_CHECKOUT_URL));
 
-// ─── Error reporting (Discord webhook) ───────────────────────────────────────
-// TODO: replace with a real Discord channel webhook URL (Channel Settings > Integrations > Webhooks).
-const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/YOUR-WEBHOOK-ID/YOUR-WEBHOOK-TOKEN';
-const reportedErrors = new Set(); // dedupe identical messages within one running session
+// ─── Hata günlüğü (yerel, hiçbir yere gönderilmez) ───────────────────────────
+const log = require('./logger');
 
-function reportErrorToDiscord(message, stack, context = 'main') {
-  if (!app.isPackaged) return; // never spam the channel from dev runs
-  if (DISCORD_WEBHOOK_URL.includes('YOUR-WEBHOOK-ID')) return; // placeholder never filled in
-
-  const dedupeKey = `${context}:${message}`;
-  if (reportedErrors.has(dedupeKey)) return;
-  reportedErrors.add(dedupeKey);
-
-  const trimmedStack = (stack || '').slice(0, 1900);
-  fetch(DISCORD_WEBHOOK_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      embeds: [{
-        title: `Soundboard hatası — ${context}`,
-        description: `\`\`\`${message}\n\n${trimmedStack}\`\`\``.slice(0, 4000),
-        color: 0xff4444,
-        fields: [
-          { name: 'Sürüm', value: app.getVersion(), inline: true },
-          { name: 'Platform', value: process.platform, inline: true },
-        ],
-        timestamp: new Date().toISOString(),
-      }],
-    }),
-  }).catch(() => { /* reporting itself must never crash the app */ });
-}
-
-process.on('uncaughtException', (err) => reportErrorToDiscord(err.message, err.stack, 'main:uncaughtException'));
+process.on('uncaughtException', (err) => log.error('main:uncaughtException', err.message, err.stack));
 process.on('unhandledRejection', (reason) => {
   const err = reason instanceof Error ? reason : new Error(String(reason));
-  reportErrorToDiscord(err.message, err.stack, 'main:unhandledRejection');
+  log.error('main:unhandledRejection', err.message, err.stack);
 });
 
-ipcMain.handle('report-renderer-error', (_, message, stack) => reportErrorToDiscord(message, stack, 'renderer'));
+ipcMain.handle('report-renderer-error', (_, message, stack) => log.error('renderer', message, stack));
+ipcMain.handle('report-issue', () => shell.openExternal(log.issueUrl()));
+ipcMain.handle('open-log-folder', () => shell.openPath(log.dir()));
 
 // ─── File Dialog ───────────────────────────────────────────────────────────────
 ipcMain.handle('open-file-dialog', async () => {

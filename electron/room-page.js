@@ -5,7 +5,7 @@ const ROOM_PAGE = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Soundboard Odası</title>
+<title>Padoboard Odası</title>
 <style>
   :root { --bg:#0b0d0b; --surface:#131713; --border:#1e231e; --text:#e8efe6; --muted:#5c665a; --accent:#c4ff00; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -26,7 +26,7 @@ const ROOM_PAGE = `<!doctype html>
 </style>
 </head>
 <body>
-<h1>Soundboard Odası</h1>
+<h1>Padoboard Odası</h1>
 <div class="row"><input id="who" placeholder="Adın" maxlength="24"></div>
 <div class="row"><input id="q" placeholder="Ses ara..."></div>
 <div class="cats" id="cats"></div>

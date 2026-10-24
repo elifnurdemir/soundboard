@@ -35,6 +35,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deactivateLicense: () => ipcRenderer.invoke('deactivate-license'),
   openCheckout: () => ipcRenderer.invoke('open-checkout'),
   reportRendererError: (message, stack) => ipcRenderer.invoke('report-renderer-error', message, stack),
+  reportIssue: () => ipcRenderer.invoke('report-issue'),
+  openLogFolder: () => ipcRenderer.invoke('open-log-folder'),
   downloadYoutubeAudio: (url) => ipcRenderer.invoke('download-youtube-audio', url),
   onYoutubeProgress: (cb) => ipcRenderer.on('youtube-download-progress', (_, pct) => cb(pct)),
   offYoutubeProgress: () => ipcRenderer.removeAllListeners('youtube-download-progress'),
