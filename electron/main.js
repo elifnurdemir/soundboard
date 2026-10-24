@@ -498,11 +498,39 @@ ipcMain.handle('open-sounds-folder', () => {
   shell.openPath(folder);
 });
 
-ipcMain.handle('save-recording', async (_, arrayBuffer, ext) => {
+// Dosya adı için güvenli hâl: yasak karakterleri at, uzunluğu sınırla (boşsa "ses")
+const safeFileBase = (n) => String(n || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'ses';
+function uniqueInSounds(base, ext) {
+  const folder = getSoundsFolder();
+  let p = path.join(folder, `${base}.${ext}`), i = 1;
+  while (fs.existsSync(p)) { p = path.join(folder, `${base}_${i}.${ext}`); i++; }
+  return p;
+}
+// Yalnızca Padoboard'un kendi oluşturduğu geçici kayıt dosyaları (kayit-123.mp3) değiştirilebilir/silinebilir
+const isOwnRecording = (p) => {
+  try { return path.dirname(path.resolve(p)) === path.resolve(getSoundsFolder()) && /^kayit-\d+\./.test(path.basename(p)); } catch (_) { return false; }
+};
+
+// opts.name: dosyaya verilecek ad (yoksa kayit-<zaman>); opts.replacePath: yerine geçtiği kayit-* dosyası silinir
+ipcMain.handle('save-recording', async (_, arrayBuffer, ext, opts = {}) => {
   try {
-    const folder = getSoundsFolder();
-    const destPath = path.join(folder, `kayit-${Date.now()}.${ext}`);
+    const safeExt = String(ext || 'mp3').replace(/[^a-z0-9]/gi, '').slice(0, 5) || 'mp3';
+    const destPath = opts && opts.name ? uniqueInSounds(safeFileBase(opts.name), safeExt) : path.join(getSoundsFolder(), `kayit-${Date.now()}.${safeExt}`);
     fs.writeFileSync(destPath, Buffer.from(arrayBuffer));
+    if (opts && opts.replacePath && isOwnRecording(opts.replacePath)) { try { fs.unlinkSync(opts.replacePath); } catch (_) { /* silinemezse kalır */ } }
+    return { success: true, destPath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// kayit-123.mp3 → kullanıcının verdiği ad (kırpma yoksa dosya olduğu gibi kalır, yalnızca adı değişir)
+ipcMain.handle('finalize-sound-file', async (_, srcPath, name) => {
+  try {
+    if (!isOwnRecording(srcPath)) return { success: true, destPath: srcPath };
+    const ext = path.extname(srcPath).slice(1) || 'mp3';
+    const destPath = uniqueInSounds(safeFileBase(name), ext);
+    fs.renameSync(srcPath, destPath);
     return { success: true, destPath };
   } catch (err) {
     return { success: false, error: err.message };

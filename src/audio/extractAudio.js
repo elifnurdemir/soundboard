@@ -44,6 +44,29 @@ export async function encodeAudioBufferToMp3(buffer, onProgress, kbps = MP3_KBPS
 }
 
 /**
+ * Bir ses dosyasının [start, end) saniyelik kısmını kesip MP3 yapar (end null: sona kadar).
+ * Kırpılan kısım gerçekten dosyaya yazılır; kalan kısım atılır.
+ */
+export async function trimToMp3(url, start, end, onProgress) {
+  const res = await fetch(url);
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  let buffer;
+  try {
+    buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+    const rate = buffer.sampleRate;
+    const from = Math.max(0, Math.floor((start || 0) * rate));
+    const to = Math.min(buffer.length, end == null ? buffer.length : Math.floor(end * rate));
+    if (to - from < rate * 0.05) throw new Error('Kırpılan bölüm çok kısa');
+    const cut = ctx.createBuffer(buffer.numberOfChannels, to - from, rate);
+    for (let c = 0; c < buffer.numberOfChannels; c++) cut.copyToChannel(buffer.getChannelData(c).subarray(from, to), c);
+    buffer = cut;
+  } finally {
+    ctx.close().catch(() => {});
+  }
+  return encodeAudioBufferToMp3(buffer, onProgress);
+}
+
+/**
  * Bir video (veya herhangi bir ses/video) dosyasının ses kanalını decode edip MP3'e çevirir.
  * Orijinal dosyaya dokunmaz. Döner: ArrayBuffer (mp3 baytları).
  */

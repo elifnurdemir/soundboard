@@ -10,7 +10,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // File system
   openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
   copyFile: (srcPath) => ipcRenderer.invoke('copy-sound-file', srcPath),
-  saveRecording: (arrayBuffer, ext) => ipcRenderer.invoke('save-recording', arrayBuffer, ext),
+  saveRecording: (arrayBuffer, ext, opts) => ipcRenderer.invoke('save-recording', arrayBuffer, ext, opts),
+  finalizeSoundFile: (srcPath, name) => ipcRenderer.invoke('finalize-sound-file', srcPath, name),
   getSoundsFolder: () => ipcRenderer.invoke('get-sounds-folder'),
   openSoundsFolder: () => ipcRenderer.invoke('open-sounds-folder'),
   openImageDialog: () => ipcRenderer.invoke('open-image-dialog'),

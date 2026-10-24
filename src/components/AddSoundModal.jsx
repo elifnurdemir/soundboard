@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import useSoundStore, { PRESET_COLORS, randomColor } from '../store/useSoundStore';
 import AudioTrimEditor from './AudioTrimEditor';
-import { extractAudioToMp3 } from '../audio/extractAudio';
+import { extractAudioToMp3, trimToMp3 } from '../audio/extractAudio';
 import ProGate from './ProGate';
 
 function ColorPicker({ value, onChange }) {
@@ -152,6 +152,9 @@ export default function AddSoundModal() {
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [recordError, setRecordError] = useState('');
   const [importStatus, setImportStatus] = useState(''); // video → mp3 dönüştürme durumu
+  // Bu pencerede Padoboard'un kendi oluşturduğu dosya (videodan çıkarılan ses ya da mikrofon kaydı): kaydederken kırpılır ve adlandırılır
+  const [ownedFile, setOwnedFile] = useState(false);
+  const savingRef = useRef(false);
   const [importError, setImportError] = useState('');
   const mediaRecorderRef = useRef(null);
   const recordChunksRef = useRef([]);
@@ -213,6 +216,7 @@ export default function AddSoundModal() {
           if (res.success) {
             setFilePath(res.destPath);
             setFileName(res.destPath.split(/[\\/]/).pop());
+            setOwnedFile(true);
             if (!name) setName(`Kayıt ${new Date().toLocaleTimeString('tr-TR')}`);
             setTrimStart(0);
             setTrimEnd(null);
@@ -262,6 +266,7 @@ export default function AddSoundModal() {
         if (!saved.success) throw new Error(saved.error || 'Kaydedilemedi');
         setFilePath(saved.destPath);
         setFileName(`${base} (ses)`);
+        setOwnedFile(true);
         if (!name) setName(base.replace(/\.[^.]+$/, ''));
         setTrimStart(0);
         setTrimEnd(null);
@@ -275,6 +280,7 @@ export default function AddSoundModal() {
     const copyResult = await window.electronAPI.copyFile(src);
     const fp = copyResult.success ? copyResult.destPath : src;
     setFilePath(fp);
+    setOwnedFile(false);
     const fn = fp.split(/[\\/]/).pop();
     setFileName(fn);
     if (!name) setName(fn.replace(/\.[^.]+$/, ''));
@@ -357,13 +363,39 @@ export default function AddSoundModal() {
     setImagePath(copyResult.success ? copyResult.destPath : result.filePaths[0]);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!filePath && !isEditing) return;
-    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, trimStart, trimEnd, playbackRate, bass, treble, reverb, cooldown, overlap, chatCommand, image: imagePath || '', noColor: imagePath ? noColor : false };
-    if (filePath) data.filePath = filePath;
+    if ((!filePath && !isEditing) || savingRef.current) return;
+    // Videodan çıkarılan ses ya da kayıt: kırpılan kısım gerçekten dosyaya yazılır (3 dk'lık dosya kalmaz) ve dosya, verdiğin adı alır
+    let finalPath = filePath, tS = trimStart, tE = trimEnd;
+    if (filePath && ownedFile && window.electronAPI) {
+      savingRef.current = true;
+      try {
+        const cut = tS > 0 || tE != null;
+        if (cut) {
+          setImportStatus('Kırpılan kısım kaydediliyor...');
+          const n = filePath.replace(/\\/g, '/');
+          const url = /^[A-Za-z]:/.test(n) ? `file:///${n}` : `file://${n}`;
+          const mp3 = await trimToMp3(url, tS, tE, (p) => setImportStatus(`Kırpılan kısım kaydediliyor... %${Math.round(p * 100)}`));
+          const saved = await window.electronAPI.saveRecording(mp3, 'mp3', { name: name || 'ses', replacePath: filePath });
+          if (!saved.success) throw new Error(saved.error || 'Kaydedilemedi');
+          finalPath = saved.destPath; tS = 0; tE = null;
+        } else {
+          const r = await window.electronAPI.finalizeSoundFile(filePath, name || 'ses');
+          if (r.success) finalPath = r.destPath;
+        }
+      } catch (err) {
+        setImportError(`Kaydedilemedi: ${err.message}`);
+        return;
+      } finally {
+        setImportStatus('');
+        savingRef.current = false;
+      }
+    }
+    const data = { name, color, volume, shortcut, categoryId, loop, fadeIn, fadeOut, trimStart: tS, trimEnd: tE, playbackRate, bass, treble, reverb, cooldown, overlap, chatCommand, image: imagePath || '', noColor: imagePath ? noColor : false };
+    if (finalPath) data.filePath = finalPath;
     if (isEditing) updateSound(editingSound.id, data);
-    else addSound({ ...data, filePath });
+    else addSound({ ...data, filePath: finalPath });
     closeAddModal();
   };
 
@@ -788,7 +820,7 @@ export default function AddSoundModal() {
             </button>
             <button
               type="submit"
-              disabled={!isEditing && !filePath}
+              disabled={(!isEditing && !filePath) || !!importStatus}
               className="flex-1 py-2.5 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold font-mono tracking-wider btn-accent"
             >
               {isEditing ? 'GÜNCELLE' : 'EKLE'}

@@ -17,6 +17,9 @@ Sürüm numaraları [package.json](package.json) ile aynıdır. Her sürümün d
 - Discord web kancasıyla hata raporlama kaldırıldı, yerine yerel günlük geldi.
 - Bağlantıdan ses indirmede içerik hakkı uyarısı eklendi.
 
+### Düzeltmeler
+- Videodan çıkarılan ses ya da mikrofon kaydını kırpıp kaydedince dosya artık gerçekten kırpılıyor (3 dakikalık video, seçilen birkaç saniye olur) ve dosya, verdiğin adı alıyor (`kayit-123.mp3` yerine `Helal.mp3`).
+
 ### Proje
 - MIT lisansı, README, CONTRIBUTING, SECURITY, üçüncü taraf bildirimleri.
 - Tanıtım sitesi (`docs/`, GitHub Pages).
