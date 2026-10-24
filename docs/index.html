@@ -8,6 +8,10 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Padoboard · Tüm sesler, tek tuşta">
 <meta property="og:description" content="Padoboard: Windows ve Linux için ücretsiz, açık kaynaklı soundboard. Oyunda ve Discord'da arkadaşlarına ses çal, sesini değiştir, kayıt al ve düzenle. Hesap, reklam ve takip yok.">
+<meta property="og:image" content="https://elifnurdemir.github.io/soundboard/og.png">
+<meta property="og:image:width" content="1216">
+<meta property="og:image:height" content="669">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" href="icon.png">
 <title>Padoboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -487,7 +491,7 @@ footer a{text-decoration:underline;text-underline-offset:3px}
       </article>
       <article class="tile t2">
         <h3>Ses değiştirici</h3>
-        <p>Mikrofonuna efekt ekle. Bir ayar seç, kısa bir melodiyle dene.</p>
+        <p>Mikrofonuna efekt ekle: dokuz hazır ayar, kısa bir melodiyle dene.</p>
         <div class="chips" id="chips" role="group" aria-label="Ses ayarı"></div>
       </article>
       <article class="tile t3">
@@ -934,7 +938,8 @@ $$('.mp, .orow button').forEach(function(b){
 // ses değiştirici
 var PRESETS = [
   { n: 'Normal', r: 1 }, { n: 'Sincap', r: 1.8 }, { n: 'Kalın', r: 0.62 }, { n: 'Robot', r: 1, robot: true },
-  { n: 'Yankı', r: 1, echo: true }, { n: 'Canavar', r: 0.45, low: true }, { n: 'Uzaylı', r: 1.25, vib: true }
+  { n: 'Yankı', r: 1, echo: true }, { n: 'Canavar', r: 0.45, low: true }, { n: 'Uzaylı', r: 1.25, vib: true },
+  { n: 'Telsiz', r: 1, radio: true }, { n: 'Mağara', r: 0.9, cave: true }
 ];
 var curPreset = 0, chips = $('#chips');
 PRESETS.forEach(function(p, i){
@@ -961,7 +966,24 @@ function playVoice(){
     var dl = ctx.createDelay(1), fb = ctx.createGain(); dl.delayTime.value = 0.24; fb.gain.value = 0.45;
     node.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(master);
   }
-  node.connect(master);
+  if (P.radio) {
+    // dar bant + hafif bozulma
+    var hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 320;
+    var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3300;
+    var ws = ctx.createWaveShaper(), curve = new Float32Array(512);
+    for (var q = 0; q < 512; q++) { var xx = q / 256 - 1; curve[q] = Math.tanh(xx * 10) / Math.tanh(10); }
+    ws.curve = curve;
+    node.connect(hp); hp.connect(lp); lp.connect(ws); ws.connect(master); node = null;
+  }
+  if (P.cave) {
+    // sentetik dürtü yanıtıyla uzun yankı
+    var len = Math.floor(ctx.sampleRate * 2), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (var c = 0; c < 2; c++) { var d = ir.getChannelData(c); for (var k = 0; k < len; k++) d[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / len, 3); }
+    var cv = ctx.createConvolver(); cv.buffer = ir;
+    var cg = ctx.createGain(); cg.gain.value = 0.8;
+    node.connect(cv); cv.connect(cg); cg.connect(master); end += 2;
+  }
+  if (node) node.connect(master);
   notes.forEach(function(f, i){
     var ts = t + i * dur, o = ctx.createOscillator(), g = ctx.createGain();
     var f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter(), mix = ctx.createGain();

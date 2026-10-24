@@ -20,7 +20,7 @@ class VoiceChatRouter {
     this.micAudioEl = null;
     this.micAudioCtx = null;
     this.voiceChanger = null;
-    this.voiceFx = { pitch: 0, robot: false, echo: 0 };
+    this.voiceFx = { pitch: 0, robot: false, echo: 0, radio: false, cave: 0 };
   }
 
   /** Live voice-changer params: { pitch, robot, echo }. Applied to mic passthrough. */

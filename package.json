@@ -1,6 +1,6 @@
 {
   "name": "soundboard",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "Soundboard Desktop Application",
   "author": {
     "name": "Mert Metin",
@@ -24,7 +24,7 @@
   },
   "build": {
     "appId": "com.soundboard.app",
-    "productName": "Soundboard",
+    "productName": "Padoboard",
     "copyright": "Copyright © 2025",
     "directories": {
       "output": "release",
@@ -67,7 +67,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Soundboard",
+      "shortcutName": "Padoboard",
       "include": "build-assets/installer.nsh"
     },
     "mac": {
@@ -84,6 +84,7 @@
       ]
     },
     "linux": {
+      "executableName": "padoboard",
       "icon": "build-assets/icon-1024.png",
       "category": "Utility",
       "extraResources": [

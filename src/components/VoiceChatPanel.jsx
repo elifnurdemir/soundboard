@@ -185,7 +185,7 @@ export default function VoiceChatPanel() {
                     {installing ? 'KURULUYOR...' : (isLinux ? '⚡ SANAL MİKROFON OLUŞTUR' : '⚡ OTOMATİK KUR')}
                   </button>
                   <p className="text-[9px] font-mono" style={{ color: '#3c4238' }}>
-                    {isLinux ? 'PulseAudio ya da PipeWire üzerinde çalışır (pactl gerekir). Yönetici izni istemez.' : "VB-CABLE, VB-Audio'nun donationware ürünüdür — vb-cable.com. Kurulum sırasında bir Windows güvenlik onayı çıkacak."}
+                    {isLinux ? 'PulseAudio ya da PipeWire üzerinde çalışır (pactl gerekir). Yönetici izni istemez.' : "VB-CABLE, VB-Audio'nun donationware ürünüdür; tüm katkılar memnuniyetle karşılanır — vb-cable.com. Kurulum sırasında bir Windows güvenlik onayı çıkacak."}
                   </p>
                   {installMessage && (
                     <p className="text-[10px] font-mono" style={{ color: installMessage.startsWith('Kurulum tamamlandı') ? '#00ff80' : '#ff6b6b' }}>
@@ -350,7 +350,7 @@ export default function VoiceChatPanel() {
                 {VOICE_PRESETS.map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => setVoiceFx({ pitch: p.pitch, robot: p.robot, echo: p.echo }, p.id)}
+                    onClick={() => setVoiceFx({ pitch: p.pitch, robot: p.robot, echo: p.echo, radio: p.radio, cave: p.cave }, p.id)}
                     className="px-2.5 py-1 text-[10px] font-bold font-mono tracking-wider border transition-colors"
                     style={voicePreset === p.id
                       ? { borderColor: 'var(--accent-border)', color: 'var(--accent)', background: 'var(--accent-dim)' }
@@ -396,6 +396,17 @@ export default function VoiceChatPanel() {
 
               {room.error && <p className="text-[10px] font-mono text-red-400">{room.error}</p>}
 
+              <details className="text-[11px] font-mono" style={{ color: '#8e9c8b' }}>
+                <summary className="cursor-pointer select-none" style={{ color: 'var(--accent)' }}>Nasıl kullanılır?</summary>
+                <ol className="mt-2 space-y-1.5 list-decimal pl-4">
+                  <li>Odayı aç. Aşağıda bir bağlantı çıkar.</li>
+                  <li>Bağlantıyı kopyalayıp arkadaşına gönder. Aynı ağdaysa (aynı ev ya da Wi-Fi) doğrudan açar.</li>
+                  <li>Arkadaşın bağlantıyı tarayıcıda açar, bir sese dokunur, ses sende çalar. Onun bir şey kurması gerekmez.</li>
+                  <li>Farklı ağdaysanız Tailscale ya da ZeroTier ile aynı özel ağa girin ve o ağın adresini kullanın. Router'da port açmanı önermem.</li>
+                  <li>Windows güvenlik duvarı sorarsa "Özel ağlar"a izin ver.</li>
+                </ol>
+              </details>
+
               {room.running && (
                 <div className="space-y-2">
                   <p className="text-[10px] font-mono" style={{ color: '#8e9c8b' }}>
@@ -417,7 +428,7 @@ export default function VoiceChatPanel() {
                     </div>
                   ))}
                   <p className="text-[9px] font-mono" style={{ color: '#3c4238' }}>
-                    Aynı ağdaki biri bu linki açabilir. İnternetten bağlanmaları için router'da {room.port} portunu yönlendir ya da Tailscale/ZeroTier kullan.
+                    Aynı ağdaki biri bu linki açabilir. İnternetten bağlanmaları için Tailscale ya da ZeroTier kullan; portu internete açma.
                     Linki sadece güvendiklerine ver; odayı kapatınca kod geçersiz olur.
                   </p>
 

@@ -485,6 +485,9 @@ export default function AddSoundModal() {
                         {downloadError && (
                           <p className="text-[10px] font-mono mt-1 text-red-400">{downloadError}</p>
                         )}
+                        <p className="text-[10px] font-mono mt-1" style={{ color: '#5c665a' }}>
+                          Yalnızca kullanma hakkın olan ya da izin verilen içerikler için. Bağlantıdaki sitenin kullanım şartlarına uymak sana aittir.
+                        </p>
                       </div>
                     </ProGate>
                   )}

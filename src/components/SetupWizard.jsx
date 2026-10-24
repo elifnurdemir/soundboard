@@ -18,12 +18,12 @@ const MIC_SHORT = isLinux ? 'Padoboard Mikrofon' : 'CABLE Output';
 const APPS = [
   {
     id: 'discord', name: 'Discord',
-    path: ['Kullanıcı Ayarları (dişli)', 'Ses ve Video', 'Giriş Aygıtı'],
+    path: ['Kullanıcı Ayarları (dişli)', 'Ses ve Video (Voice & Video)', 'Giriş Aygıtı (Input Device)'],
     tip: 'Aynı sayfada "Gürültü Bastırma" ve "Otomatik Giriş Hassasiyeti" ses efektlerini kesebilir. Kapatman iyi olur.',
   },
   {
     id: 'steam', name: 'Steam',
-    path: ['Steam → Ayarlar', 'Ses', 'Ses Giriş Aygıtı'],
+    path: ['Steam → Ayarlar (Settings)', 'Ses (Voice)', 'Ses Giriş Aygıtı (Voice Input Device)'],
     tip: 'Steam Uzaktan Oynat ve Steam sesli sohbeti için geçerlidir. Oyunun kendi sohbeti ayrı ayarlanır.',
   },
   {
@@ -220,7 +220,7 @@ export default function SetupWizard() {
               )}
               {!isLinux && (
                 <p className="text-[10px] font-mono pt-2 border-t border-app-border" style={{ color: '#3c4238' }}>
-                  VB-CABLE, VB-Audio Software'in bağışla desteklenen (donationware) ürünüdür. vb-cable.com
+                  VB-CABLE, VB-Audio Software'in bağışla desteklenen (donationware) ürünüdür. Tüm katkılar memnuniyetle karşılanır: vb-cable.com
                 </p>
               )}
             </div>

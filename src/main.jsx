@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-// Forward renderer crashes to the same Discord-webhook reporting main process uses.
+// Arayüz hatalarını ana sürecin yerel günlüğüne (hiçbir yere gönderilmeden) yaz.
 window.addEventListener('error', (e) => {
   window.electronAPI?.reportRendererError(e.message, e.error?.stack || '');
 });

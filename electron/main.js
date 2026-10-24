@@ -12,6 +12,10 @@ const linuxAudio = process.platform === 'linux' ? require('./linuxAudio') : null
 
 const isDev = !app.isPackaged;
 
+// Uygulama adı "Padoboard" oldu ama kullanıcı verisi eski klasörde ("Soundboard") kalır: ayarlar ve sesler kaybolmasın.
+// Paketli sürümde yolu sabitliyoruz; geliştirme modu kendi klasörünü kullanır.
+if (app.isPackaged) app.setPath('userData', path.join(app.getPath('appData'), 'Soundboard'));
+
 // AppImage'ta Chromium sandbox'ı, kullanıcı alanı izolasyonunu kapatan dağıtımlarda (ör. Ubuntu 24.04) açılmayı engeller.
 // Uygulama yalnızca kendi yerel arayüzünü yükler; sandbox'ı sadece AppImage için kapatıyoruz.
 if (process.platform === 'linux' && process.env.APPIMAGE) app.commandLine.appendSwitch('no-sandbox');
@@ -619,7 +623,7 @@ ipcMain.handle('install-virtual-cable', async () => {
 // Known voice/call apps are excluded everywhere below: routing them into CABLE Input (which is
 // also used as Discord's mic input) would echo the other person's own voice back to them.
 const VOICE_APP_BLOCKLIST = new Set(['discord.exe', 'teams.exe', 'zoom.exe', 'skype.exe', 'slack.exe']);
-const SYSTEM_NOISE_EXE = new Set(['svchost.exe', 'dwm.exe', 'explorer.exe', 'soundboard.exe']);
+const SYSTEM_NOISE_EXE = new Set(['svchost.exe', 'dwm.exe', 'explorer.exe', 'soundboard.exe', 'padoboard.exe']);
 
 function getSvclPath() {
   return app.isPackaged
@@ -939,7 +943,7 @@ ipcMain.handle('get-app-version', () => app.getVersion());
 ipcMain.handle('export-zip', async (_, { categories, sounds, settings }) => {
   if (!mainWindow) return { success: false };
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-    title: 'Soundboard Dışa Aktar',
+    title: 'Padoboard Dışa Aktar',
     defaultPath: `soundboard-export-${Date.now()}.zip`,
     filters: [{ name: 'ZIP', extensions: ['zip'] }],
   });
@@ -983,7 +987,7 @@ ipcMain.handle('export-zip', async (_, { categories, sounds, settings }) => {
 ipcMain.handle('import-zip', async () => {
   if (!mainWindow) return { success: false };
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-    title: 'Soundboard İçe Aktar',
+    title: 'Padoboard İçe Aktar',
     filters: [{ name: 'ZIP', extensions: ['zip'] }],
     properties: ['openFile'],
   });

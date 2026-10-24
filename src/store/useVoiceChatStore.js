@@ -10,7 +10,7 @@ const useVoiceChatStore = create((set, get) => ({
   error: null,
   routedApps: {}, // { [exeName]: previousDeviceId }
   voicePreset: 'normal',
-  voiceFx: { pitch: 0, robot: false, echo: 0 },
+  voiceFx: { pitch: 0, robot: false, echo: 0, radio: false, cave: 0 },
 
   // Voice changer — pitch (semitones), robot, echo (0..1). Only reaches the mic passthrough.
   setVoiceFx: (params, presetId = 'custom') => {

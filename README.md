@@ -60,11 +60,21 @@ Electron + React + Vite + Zustand + Tailwind. Ses motoru tek bir Web Audio grafi
 
 ## Üçüncü taraf bileşenler
 
-- [VB-CABLE](https://vb-audio.com/Cable/) (VB-Audio, bağışla desteklenen yazılım): Windows'ta sanal ses kablosu
+- [VB-CABLE](https://vb-cable.com) (VB-Audio, bağışla desteklenen yazılım, tüm katkılar memnuniyetle karşılanır): Windows'ta sanal ses kablosu
 - PulseAudio / PipeWire (`pactl`): Linux'ta sanal mikrofon ve uygulama yönlendirme
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp): bağlantıdan ses indirme
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp): bağlantıdan ses indirme. Yalnızca kullanma hakkın olan içerikler için, sitenin kullanım şartlarına uymak sana aittir.
 - [Openverse](https://openverse.org): CC0 ses kütüphanesi
-- [lamejs](https://github.com/zhuker/lamejs): MP3 kodlama
+- [lamejs](https://github.com/zhuker/lamejs) (LGPL-3.0): MP3 kodlama
+
+Tüm bileşenler, lisansları ve uygulamaya nasıl eklendikleri için [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) dosyasına bak.
+
+## Katkı ve güvenlik
+
+Katkı vermek için [CONTRIBUTING.md](CONTRIBUTING.md), güvenlik açığı bildirmek için [SECURITY.md](SECURITY.md), sürüm notları için [CHANGELOG.md](CHANGELOG.md).
+
+## Kod imzalama
+
+Windows kurulum dosyası şu an imzasız. Açık kaynak projeler için ücretsiz imzalama sağlayan [SignPath Foundation](https://signpath.org)'a başvurulacak. Onaylanırsa imzalama GitHub Actions derlemesi içinde yapılacak ve bu bölüm güncellenecek. O zamana kadar Windows "bilinmeyen yayıncı" uyarısı gösterebilir.
 
 ## Destek
 

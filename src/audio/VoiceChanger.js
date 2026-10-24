@@ -1,7 +1,7 @@
 /**
  * VoiceChanger — mikrofon için gerçek zamanlı pitch / robot / yankı zinciri.
  *
- *   input → [pitch shift | bypass] → [ring-mod "robot" | bypass] → [echo] → output
+ *   input → [pitch shift | bypass] → [ring-mod "robot" | bypass] → [echo] → [telsiz | bypass] → [mağara | bypass] → output
  *
  * Pitch shift: iki gecikme hattı (delay tap), gecikme süresi testere dişi ile
  * sürekli kaydırılıyor (Doppler → perde değişimi) ve sin² pencereleriyle
@@ -12,17 +12,42 @@
 // duyulur, çok kısa pencere vızıltı yapar; ~60 ms konuşma için makul bir orta nokta.
 const PERIOD = 0.06;
 
+// radio: telsiz/telefon sesi (dar bant + hafif bozulma), cave: mağara yankısı miktarı (0..1)
 export const VOICE_PRESETS = [
-  { id: 'normal', label: 'Normal', pitch: 0, robot: false, echo: 0 },
-  { id: 'chipmunk', label: 'Sincap', pitch: 7, robot: false, echo: 0 },
-  { id: 'deep', label: 'Kalın', pitch: -5, robot: false, echo: 0 },
-  { id: 'robot', label: 'Robot', pitch: 0, robot: true, echo: 0 },
-  { id: 'echo', label: 'Yankı', pitch: 0, robot: false, echo: 0.45 },
-  { id: 'monster', label: 'Canavar', pitch: -9, robot: false, echo: 0.3 },
-  { id: 'alien', label: 'Uzaylı', pitch: 4, robot: true, echo: 0.2 },
+  { id: 'normal', label: 'Normal', pitch: 0, robot: false, echo: 0, radio: false, cave: 0 },
+  { id: 'chipmunk', label: 'Sincap', pitch: 7, robot: false, echo: 0, radio: false, cave: 0 },
+  { id: 'deep', label: 'Kalın', pitch: -5, robot: false, echo: 0, radio: false, cave: 0 },
+  { id: 'robot', label: 'Robot', pitch: 0, robot: true, echo: 0, radio: false, cave: 0 },
+  { id: 'echo', label: 'Yankı', pitch: 0, robot: false, echo: 0.45, radio: false, cave: 0 },
+  { id: 'monster', label: 'Canavar', pitch: -9, robot: false, echo: 0.3, radio: false, cave: 0 },
+  { id: 'alien', label: 'Uzaylı', pitch: 4, robot: true, echo: 0.2, radio: false, cave: 0 },
+  { id: 'radio', label: 'Telsiz', pitch: 0, robot: false, echo: 0, radio: true, cave: 0 },
+  { id: 'cave', label: 'Mağara', pitch: -2, robot: false, echo: 0.12, radio: false, cave: 0.6 },
 ];
 
 export const PRESET_DEFAULT = VOICE_PRESETS[0];
+
+// Mağara için sentetik dürtü yanıtı: üstel sönen gürültü (2 sn)
+function makeImpulse(ctx, seconds = 2) {
+  const len = Math.floor(ctx.sampleRate * seconds);
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+  }
+  return buf;
+}
+
+// Hafif doyum eğrisi (telsizin hafif bozuk sesi)
+function makeDriveCurve(amount = 12) {
+  const n = 1024;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    curve[i] = Math.tanh(x * amount) / Math.tanh(amount);
+  }
+  return curve;
+}
 
 function makeRampBuffer(ctx, fn) {
   const len = Math.floor(ctx.sampleRate * PERIOD);
@@ -38,7 +63,8 @@ export class VoiceChanger {
     this.input = ctx.createGain();
     this.output = ctx.createGain();
     this._sources = []; // looping modulators — stopped on destroy
-    this.params = { pitch: 0, robot: false, echo: 0 };
+    this.params = { pitch: 0, robot: false, echo: 0, radio: false, cave: 0 };
+    this.core = ctx.createGain(); // pitch/robot/yankı zincirinin çıkışı; telsiz ve mağara bunun ardından
 
     // ── Stage 1: pitch ──
     this.pitchDry = ctx.createGain();
@@ -73,12 +99,34 @@ export class VoiceChanger {
     this.echoFeedback = ctx.createGain();
     this.echoFeedback.gain.value = 0.38;
     this.echoSend = ctx.createGain();
-    this.robotOut.connect(this.output);
+    this.robotOut.connect(this.core);
     this.robotOut.connect(this.echoSend);
     this.echoSend.connect(this.echoDelay);
     this.echoDelay.connect(this.echoFeedback);
     this.echoFeedback.connect(this.echoDelay);
-    this.echoDelay.connect(this.output);
+    this.echoDelay.connect(this.core);
+
+    // ── Stage 4: telsiz (300–3300 Hz bant + hafif bozulma) ──
+    this.radioDry = ctx.createGain();
+    this.radioWet = ctx.createGain();
+    this.radioOut = ctx.createGain();
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 320; hp.Q.value = 0.9;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3300; lp.Q.value = 0.9;
+    const drive = ctx.createWaveShaper(); drive.curve = makeDriveCurve(); drive.oversample = '2x';
+    const radioLevel = ctx.createGain(); radioLevel.gain.value = 0.7;
+    this.core.connect(this.radioDry);
+    this.radioDry.connect(this.radioOut);
+    this.core.connect(hp); hp.connect(lp); lp.connect(drive); drive.connect(radioLevel); radioLevel.connect(this.radioWet);
+    this.radioWet.connect(this.radioOut);
+
+    // ── Stage 5: mağara (sentetik dürtü yanıtıyla yankı) ──
+    this.caveWet = ctx.createGain();
+    const convolver = ctx.createConvolver();
+    convolver.buffer = makeImpulse(ctx);
+    this.radioOut.connect(this.output);
+    this.radioOut.connect(convolver);
+    convolver.connect(this.caveWet);
+    this.caveWet.connect(this.output);
 
     this.set(this.params);
   }
@@ -119,10 +167,10 @@ export class VoiceChanger {
     return taps;
   }
 
-  /** params: { pitch: semitones (-12..12), robot: bool, echo: 0..1 } */
+  /** params: { pitch: semitones (-12..12), robot: bool, echo: 0..1, radio: bool, cave: 0..1 } */
   set(params) {
     this.params = { ...this.params, ...params };
-    const { pitch, robot, echo } = this.params;
+    const { pitch, robot, echo, radio, cave } = this.params;
     const t = this.ctx.currentTime;
 
     // Pitch: ratio r → delay slope (1 - r). Window length PERIOD → swing = |1 - r| * PERIOD.
@@ -141,6 +189,10 @@ export class VoiceChanger {
     this.robotDry.gain.setTargetAtTime(robot ? 0 : 1, t, 0.02);
 
     this.echoSend.gain.setTargetAtTime(Math.min(1, Math.max(0, echo)), t, 0.02);
+
+    this.radioWet.gain.setTargetAtTime(radio ? 1 : 0, t, 0.02);
+    this.radioDry.gain.setTargetAtTime(radio ? 0 : 1, t, 0.02);
+    this.caveWet.gain.setTargetAtTime(Math.min(1, Math.max(0, cave || 0)) * 0.9, t, 0.02);
   }
 
   destroy() {
