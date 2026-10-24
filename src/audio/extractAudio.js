@@ -44,10 +44,40 @@ export async function encodeAudioBufferToMp3(buffer, onProgress, kbps = MP3_KBPS
 }
 
 /**
+ * Sesi gain kadar yükseltir (Audacity'deki Amplify gibi, dosyaya işlenir). Çıkışta bir sınırlayıcı (limiter) vardır:
+ * yükselen tepeler sert kesilip cızırdamaz, yumuşakça kısılır.
+ */
+export async function amplifyBuffer(buffer, gain) {
+  const off = new OfflineAudioContext(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+  const src = off.createBufferSource();
+  src.buffer = buffer;
+  const g = off.createGain();
+  g.gain.value = gain;
+  const lim = off.createDynamicsCompressor();
+  lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.1;
+  src.connect(g); g.connect(lim); lim.connect(off.destination);
+  src.start();
+  return off.startRendering();
+}
+
+/** Tam dosyayı yükseltip MP3 yapar (kırpma yok). */
+export async function amplifyToMp3(url, gain, onProgress) {
+  const res = await fetch(url);
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  let buffer;
+  try {
+    buffer = await amplifyBuffer(await ctx.decodeAudioData(await res.arrayBuffer()), gain);
+  } finally {
+    ctx.close().catch(() => {});
+  }
+  return encodeAudioBufferToMp3(buffer, onProgress);
+}
+
+/**
  * Bir ses dosyasının [start, end) saniyelik kısmını kesip MP3 yapar (end null: sona kadar).
  * Kırpılan kısım gerçekten dosyaya yazılır; kalan kısım atılır.
  */
-export async function trimToMp3(url, start, end, onProgress) {
+export async function trimToMp3(url, start, end, onProgress, gain = 1) {
   const res = await fetch(url);
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   let buffer;
@@ -60,6 +90,7 @@ export async function trimToMp3(url, start, end, onProgress) {
     const cut = ctx.createBuffer(buffer.numberOfChannels, to - from, rate);
     for (let c = 0; c < buffer.numberOfChannels; c++) cut.copyToChannel(buffer.getChannelData(c).subarray(from, to), c);
     buffer = cut;
+    if (gain > 1.001 || gain < 0.999) buffer = await amplifyBuffer(buffer, gain);
   } finally {
     ctx.close().catch(() => {});
   }

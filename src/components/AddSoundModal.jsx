@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import useSoundStore, { PRESET_COLORS, randomColor } from '../store/useSoundStore';
 import AudioTrimEditor from './AudioTrimEditor';
-import { extractAudioToMp3, trimToMp3 } from '../audio/extractAudio';
+import { extractAudioToMp3, trimToMp3, amplifyToMp3 } from '../audio/extractAudio';
 import ProGate from './ProGate';
 
 function ColorPicker({ value, onChange }) {
@@ -132,6 +132,9 @@ export default function AddSoundModal() {
   const [categoryId, setCategoryId] = useState(editingSound?.categoryId || 'default');
   const [loop, setLoop] = useState(editingSound?.loop ?? false);
   const [fadeIn, setFadeIn] = useState(editingSound?.fadeIn ?? 0);
+  // Güçlendirme (1x–5x): kaydederken dosyaya işlenir, Audacity'deki Amplify gibi. Çalma ses seviyesi ayrıdır (0–%100).
+  const [gain, setGain] = useState(1);
+  useEffect(() => { setGain(1); }, [filePath]);
   const [fadeOut, setFadeOut] = useState(editingSound?.fadeOut ?? 0);
   const [trimStart, setTrimStart] = useState(editingSound?.trimStart ?? 0);
   const [trimEnd, setTrimEnd] = useState(editingSound?.trimEnd ?? null);
@@ -368,6 +371,7 @@ export default function AddSoundModal() {
     if ((!filePath && !isEditing) || savingRef.current) return;
     // Videodan çıkarılan ses ya da kayıt: kırpılan kısım gerçekten dosyaya yazılır (3 dk'lık dosya kalmaz) ve dosya, verdiğin adı alır
     let finalPath = filePath, tS = trimStart, tE = trimEnd;
+    let gainApplied = false;
     if (filePath && ownedFile && window.electronAPI) {
       savingRef.current = true;
       try {
@@ -376,7 +380,8 @@ export default function AddSoundModal() {
           setImportStatus('Kırpılan kısım kaydediliyor...');
           const n = filePath.replace(/\\/g, '/');
           const url = /^[A-Za-z]:/.test(n) ? `file:///${n}` : `file://${n}`;
-          const mp3 = await trimToMp3(url, tS, tE, (p) => setImportStatus(`Kırpılan kısım kaydediliyor... %${Math.round(p * 100)}`));
+          const mp3 = await trimToMp3(url, tS, tE, (p) => setImportStatus(`Kırpılan kısım kaydediliyor... %${Math.round(p * 100)}`), gain);
+          gainApplied = true;
           const saved = await window.electronAPI.saveRecording(mp3, 'mp3', { name: name || 'ses', replacePath: filePath });
           if (!saved.success) throw new Error(saved.error || 'Kaydedilemedi');
           finalPath = saved.destPath; tS = 0; tE = null;
@@ -386,6 +391,25 @@ export default function AddSoundModal() {
         }
       } catch (err) {
         setImportError(`Kaydedilemedi: ${err.message}`);
+        return;
+      } finally {
+        setImportStatus('');
+        savingRef.current = false;
+      }
+    }
+    // Güçlendirme: dosyanın kendisi yükseltilir (kırpma zaten yapıldıysa aynı geçişte işlendi)
+    if (gain > 1.001 && finalPath && !gainApplied && window.electronAPI) {
+      savingRef.current = true;
+      try {
+        setImportStatus('Ses güçlendiriliyor...');
+        const n = finalPath.replace(/\\/g, '/');
+        const url = /^[A-Za-z]:/.test(n) ? `file:///${n}` : `file://${n}`;
+        const mp3 = await amplifyToMp3(url, gain, (p) => setImportStatus(`Ses güçlendiriliyor... %${Math.round(p * 100)}`));
+        const saved = await window.electronAPI.saveRecording(mp3, 'mp3', { name: name || 'ses', replacePath: finalPath });
+        if (!saved.success) throw new Error(saved.error || 'Kaydedilemedi');
+        finalPath = saved.destPath;
+      } catch (err) {
+        setImportError(`Güçlendirilemedi: ${err.message}`);
         return;
       } finally {
         setImportStatus('');
@@ -554,9 +578,10 @@ export default function AddSoundModal() {
                         trimEnd={trimEnd}
                         color={color}
                         onChange={({ trimStart: ts, trimEnd: te }) => { setTrimStart(ts); setTrimEnd(te); }}
-                        fx={{ volume, bass, treble, reverb, fadeIn, fadeOut, rate: playbackRate }}
+                        fx={{ volume, amp: gain, bass, treble, reverb, fadeIn, fadeOut, rate: playbackRate }}
                         onFx={(p) => {
                           if ('volume' in p) setVolume(p.volume);
+                          if ('amp' in p) setGain(p.amp);
                           if ('bass' in p) setBass(p.bass);
                           if ('treble' in p) setTreble(p.treble);
                           if ('reverb' in p) setReverb(p.reverb);
@@ -669,7 +694,7 @@ export default function AddSoundModal() {
                     <span className="font-mono" style={{ color: 'var(--accent)' }}>{Math.round(volume * 100)}%</span>
                   </label>
                   <input
-                    type="range" min="0" max="5" step="0.01"
+                    type="range" min="0" max="1" step="0.01"
                     value={volume} onChange={(e) => setVolume(Number.parseFloat(e.target.value))}
                     className="w-full volume-slider"
                   />

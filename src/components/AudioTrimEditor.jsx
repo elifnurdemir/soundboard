@@ -113,9 +113,10 @@ function ToolBtn({ children, onClick, title, active }) {
   );
 }
 
-const FX_DEFAULT = { volume: 0.8, bass: 0, treble: 0, reverb: 0, fadeIn: 0, fadeOut: 0, rate: 1 };
+const FX_DEFAULT = { volume: 0.8, amp: 1, bass: 0, treble: 0, reverb: 0, fadeIn: 0, fadeOut: 0, rate: 1 };
 const FX_ROWS = [
-  { key: 'volume', label: 'Ses seviyesi', min: 0, max: 5, step: 0.05, show: (v) => `%${Math.round(v * 100)}` },
+  { key: 'amp', label: 'Güçlendir (dosyaya işlenir)', min: 1, max: 5, step: 0.05, show: (v) => (v <= 1.001 ? 'kapalı' : `%${Math.round(v * 100)}`) },
+  { key: 'volume', label: 'Çalma ses seviyesi', min: 0, max: 1, step: 0.01, show: (v) => `%${Math.round(v * 100)}` },
   { key: 'bass', label: 'Bas', min: -12, max: 12, step: 1, show: (v) => (v === 0 ? 'kapalı' : `${v > 0 ? '+' : ''}${v} dB`) },
   { key: 'treble', label: 'Tiz', min: -12, max: 12, step: 1, show: (v) => (v === 0 ? 'kapalı' : `${v > 0 ? '+' : ''}${v} dB`) },
   { key: 'reverb', label: 'Yankı', min: 0, max: 1, step: 0.05, show: (v) => (v === 0 ? 'kapalı' : `%${Math.round(v * 100)}`) },
@@ -146,7 +147,7 @@ function FxPanel({ fx, onFx }) {
       </div>
       <div className="flex items-center justify-between gap-3">
         <p className="text-[9px] font-mono" style={{ color: '#5c665a' }}>
-          %100 üstü sesler sınırlayıcıdan geçer, patlama olmaz. Önizleme yalnızca senin hoparlöründen çıkar.
+          Güçlendirme, Audacity'deki Amplify gibi kaydederken dosyadaki sesi yükseltir (tepeler sınırlayıcıdan geçer, patlamaz). Önizleme yalnızca senin hoparlöründen çıkar.
         </p>
         <ToolBtn onClick={() => onFx(FX_DEFAULT)} title="Ses ve efektleri varsayılana döndür">SIFIRLA</ToolBtn>
       </div>
@@ -389,7 +390,7 @@ function WaveEditor({
           SEÇİME SIĞDIR
         </ToolBtn>
         <ToolBtn onClick={() => setView({ start: 0, end: duration })} title="Tüm dosyayı göster" active={!zoomed}>TÜMÜ</ToolBtn>
-        {onFx && <ToolBtn onClick={() => setFxOpen((v) => !v)} title="Ses seviyesi (%500'e kadar) ve efektler" active={fxOpen}>{fxOpen ? '▾' : '▸'} SES VE EFEKTLER</ToolBtn>}
+        {onFx && <ToolBtn onClick={() => setFxOpen((v) => !v)} title="Güçlendirme (%500'e kadar, dosyaya işlenir) ve efektler" active={fxOpen}>{fxOpen ? '▾' : '▸'} SES VE EFEKTLER</ToolBtn>}
         <div className="flex-1" />
         <ToolBtn onClick={onToggleExpand} title={expanded ? 'Küçült' : 'Büyük pencerede aç'}>
           {expanded ? '✕ KÜÇÜLT' : '⤢ BÜYÜT'}
@@ -534,7 +535,7 @@ export default function AudioTrimEditor({ filePath, trimStart = 0, trimEnd = nul
     try {
       const voice = await audioEngine.play(toUrl(filePath), {
         local: true, range: true,
-        volume: fx.volume, rate: fx.rate, bass: fx.bass, treble: fx.treble, reverb: fx.reverb, fadeIn: fx.fadeIn, fadeOut: fx.fadeOut,
+        volume: fx.volume * fx.amp, rate: fx.rate, bass: fx.bass, treble: fx.treble, reverb: fx.reverb, fadeIn: fx.fadeIn, fadeOut: fx.fadeOut,
         trimStart, trimEnd: effectiveEnd >= duration - 0.005 ? null : effectiveEnd,
         onEnded: () => { if (voiceRef.current === voice) stopPreview(); },
       });
@@ -555,9 +556,9 @@ export default function AudioTrimEditor({ filePath, trimStart = 0, trimEnd = nul
   useEffect(() => {
     const v = voiceRef.current;
     if (!v) return;
-    v.setVolume(fx.volume);
+    v.setVolume(fx.volume * fx.amp);
     v.setFx({ bass: fx.bass, treble: fx.treble, reverb: fx.reverb });
-  }, [fx.volume, fx.bass, fx.treble, fx.reverb]);
+  }, [fx.volume, fx.amp, fx.bass, fx.treble, fx.reverb]);
 
   // Boşluk tuşu her zaman çal / durdur (yazı alanlarında boşluk yazılır; sürgü ve düğmeler boşluğu yutmaz)
   useEffect(() => {

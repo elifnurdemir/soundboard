@@ -13,7 +13,7 @@ Sürüm numaraları [package.json](package.json) ile aynıdır. Her sürümün d
 - Sürüm iş akışı (GitHub Actions): etiketle Windows ve Linux paketleri derlenir.
 
 ### Değişti
-- **Kırpma editöründe ses seviyesi %500'e kadar** ve ses efektleri (bas, tiz, yankı, belirme, sönme, hız): önizlemede canlı duyulur, Ses Ekle penceresindeki ayarlarla ortaktır. %100 üstü sesler sınırlayıcıdan geçer. Buton üzerindeki ses sürgüsü de %500'e kadar.
+- **Kırpma editöründe güçlendirme (%100–%500) ve ses efektleri** (bas, tiz, yankı, belirme, sönme, hız): Audacity'deki Amplify gibi, güçlendirme kaydederken dosyadaki sesin kendisini yükseltir (tepeler sınırlayıcıdan geçer, patlamaz). Önizleme canlı ve yalnızca senin hoparlöründen çıkar. Çalma ses seviyesi (butondaki ve Ses Ekle sürgüsü) %0–%100 olarak kaldı.
 - **Boşluk tuşu** kırpma editöründe her zaman çal / durdur. Yazı yazarken ya da Ses Ekle penceresi açıkken global kısayollar artık ses tetiklemiyor.
 - Uygulama adı **Padoboard** oldu (başlık, tepsi, kurulum dosyası). Mevcut ayarlar ve sesler korunur.
 - Discord web kancasıyla hata raporlama kaldırıldı, yerine yerel günlük geldi.
