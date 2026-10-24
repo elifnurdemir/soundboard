@@ -1,0 +1,1224 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Padoboard: Windows ve Linux için ücretsiz, açık kaynaklı soundboard. Oyunda ve Discord'da arkadaşlarına ses çal, sesini değiştir, kayıt al ve düzenle. Hesap, reklam ve takip yok.">
+<meta name="theme-color" content="#c4ff00">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Padoboard · Tüm sesler, tek tuşta">
+<meta property="og:description" content="Padoboard: Windows ve Linux için ücretsiz, açık kaynaklı soundboard. Oyunda ve Discord'da arkadaşlarına ses çal, sesini değiştir, kayıt al ve düzenle. Hesap, reklam ve takip yok.">
+<link rel="icon" type="image/png" href="icon.png">
+<title>Padoboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Konsept: lime poster bandı + soğuk gri zemin. Ürünün kendisi sahne: gerçek arayüz, sert siyah gölgeler, tek vurgu rengi. Bilerek tek görünüm (açık). */
+:root{
+  --lime:#c4ff00; --ink:#0a0d0a; --gray:#e8eaec; --gray2:#dadee1; --white:#ffffff; --muted:#4a5258; --soft:#9fb09c;
+  --coral:#ff5a3c; --amber:#ffb020; --sky:#4aa3ff; --mint:#2de2a6; --violet:#9b6bff; --pink:#ff5fa2; --teal:#1fd1d1;
+  --display:'Bricolage Grotesque','Arial Narrow',Arial,sans-serif;
+  --body:'Geist',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+  --u:min(.069444vw,1.1111px);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--gray);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--lime);z-index:80}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.dark :focus-visible,.hero .top :focus-visible{outline-color:var(--ink)}
+.band-ink :focus-visible{outline-color:var(--lime)}
+.wrap{width:100%;max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mono{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.disp{font-family:var(--display);font-weight:800;font-stretch:78%;letter-spacing:-.02em;line-height:.92;margin:0;text-wrap:balance;text-transform:uppercase}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:0 26px;border:0;background:var(--ink);color:var(--lime);font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+.btn.line{background:transparent;color:var(--ink);border:1px solid var(--ink)}
+.btn.lime{background:var(--lime);color:var(--ink)}
+.btn.sm{min-height:44px;padding:0 20px;font-size:12px}
+
+/* ---------- Hero (A + C) ---------- */
+.hero{position:relative;height:calc(var(--u)*900);overflow:hidden;background:var(--gray)}
+.hero .top{position:absolute;left:0;right:0;top:0;height:calc(var(--u)*430);background:var(--lime)}
+.hero .stage,.hero .stage2{position:absolute;left:50%;top:0;width:calc(var(--u)*1440);height:100%;transform:translateX(-50%)}
+.hnav{position:absolute;left:calc(var(--u)*56);right:calc(var(--u)*56);top:calc(var(--u)*28);display:flex;align-items:center;gap:28px;font-family:var(--mono);font-weight:700;font-size:max(12px,calc(var(--u)*13));letter-spacing:.12em}
+.hnav .links{margin-left:auto;display:flex;gap:32px}
+.snd{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;background:transparent;border:1px solid var(--ink);cursor:pointer;font-family:var(--mono);font-weight:700;font-size:12px;letter-spacing:.1em}
+.snd i{display:inline-flex;align-items:flex-end;gap:2px;height:14px}
+.snd i b{display:block;width:3px;height:5px;background:var(--ink)}
+.snd[aria-pressed="true"]{background:var(--ink);color:var(--lime)}
+.snd[aria-pressed="true"] i b{background:var(--lime);animation:eq 900ms ease-in-out infinite}
+.snd[aria-pressed="true"] i b:nth-child(2){animation-delay:-.3s}.snd[aria-pressed="true"] i b:nth-child(3){animation-delay:-.6s}
+@keyframes eq{0%,100%{height:4px}50%{height:14px}}
+.wm{position:absolute;left:calc(var(--u)*44);top:calc(var(--u)*76);margin:0;font-family:var(--display);font-weight:800;font-stretch:75%;font-size:calc(var(--u)*330);line-height:.82;letter-spacing:-.03em;white-space:nowrap}
+.htext{position:absolute;left:calc(var(--u)*80);top:calc(var(--u)*476);width:calc(var(--u)*430);display:flex;flex-direction:column;gap:calc(var(--u)*26)}
+.htext h2{margin:0;font-size:calc(var(--u)*76);line-height:.98;font-weight:600;letter-spacing:-.04em}
+.htext h2 mark{background:var(--lime);color:var(--ink);padding:0 .15em 0 .08em}
+.htext p{margin:0;font-size:max(16px,calc(var(--u)*19));line-height:1.5;color:var(--muted);max-width:26em}
+.hbtns{display:flex;flex-wrap:wrap;gap:10px}
+.sticker{position:absolute;left:calc(var(--u)*330);top:calc(var(--u)*360);width:calc(var(--u)*150);height:auto;transform:rotate(-9deg);transition:transform .2s}
+.sticker.hit{animation:spop .4s ease-out}
+@keyframes spop{40%{transform:rotate(-9deg) scale(1.12)}}
+.hwin{position:absolute;left:calc(var(--u)*520);top:calc(var(--u)*320);width:calc(var(--u)*1000);transform:rotate(-2.5deg);transform-origin:left top}
+.hwin .shell{box-shadow:calc(var(--u)*14) calc(var(--u)*14) 0 var(--ink)}
+.shell{position:relative;width:100%;aspect-ratio:1000/620;overflow:hidden;background:#0b0d0b}
+.shell .inner{position:absolute;left:0;top:0;transform-origin:0 0}
+
+/* uygulama penceresi (1000x620) */
+.appwin{width:1000px;height:620px;background:#0b0d0b;border:1px solid #232b23;display:flex;flex-direction:column;font-family:var(--mono);color:#e8efe5}
+.appwin .tb{height:46px;flex:none;display:flex;align-items:center;gap:12px;padding:0 12px;border-bottom:1px solid #1e251e}
+.appwin .tb .nm{font-weight:700;font-size:13px;letter-spacing:.14em}
+.appwin .srch{margin-left:8px;width:230px;height:30px;border:1px solid #232b23;background:#0e120e;display:flex;align-items:center;padding:0 10px;font-size:12px;color:#8e9c8b}
+.appwin .play{display:flex;align-items:center;height:28px;padding:0 10px;margin-left:8px;font-size:11px;letter-spacing:.08em;color:var(--lime);border:1px solid rgba(196,255,0,.3);background:rgba(196,255,0,.07);opacity:.0;transition:opacity .2s}
+.appwin.on .play{opacity:1}
+.appwin .acts{margin-left:auto;display:flex;align-items:center;gap:8px}
+.appwin .acts span{height:28px;padding:0 12px;display:flex;align-items:center;font-size:11px;font-weight:700;letter-spacing:.08em}
+.appwin .body{flex:1;min-height:0;display:flex}
+.appwin .side{width:188px;flex:none;border-right:1px solid #1e251e;padding:12px;display:flex;flex-direction:column;gap:6px;background:#0a0c0a}
+.appwin .grid{flex:1;min-width:0;padding:16px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:1fr;gap:10px}
+.ap{position:relative;border:0;padding:9px 10px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;text-align:left;background:var(--c);color:#0a0d0a;cursor:pointer;font-family:var(--mono);transition:transform .1s,filter .1s}
+.ap:hover{filter:brightness(1.08)}
+.ap:active,.ap.go{transform:scale(.96)}
+.ap.go{box-shadow:0 0 0 2px #fff,0 0 22px rgba(255,255,255,.4)}
+.ap svg{width:16px;height:16px;fill:#0a0d0a}
+.ap b{font-size:12px;line-height:1.15}
+
+/* ---------- Kayan şerit ---------- */
+.marquee{overflow:hidden;background:var(--ink);color:var(--gray);padding-block:20px}
+.marquee .tilt{display:flex;width:max-content;transform:skewX(var(--skew,0deg));will-change:transform}
+.marquee .run{display:flex;gap:40px;padding-right:40px;animation:run 40s linear infinite}
+.marquee span{font-family:var(--display);font-weight:800;font-stretch:76%;font-size:clamp(34px,5vw,68px);line-height:1;text-transform:uppercase;white-space:nowrap;display:inline-flex;align-items:center;gap:40px}
+.marquee span::after{content:"";width:14px;height:14px;background:var(--lime);border-radius:50%}
+.marquee span:nth-child(3n+1){color:var(--lime)}
+.marquee span:nth-child(3n+2){-webkit-text-stroke:1.5px var(--gray);color:transparent}
+@keyframes run{to{transform:translateX(-100%)}}
+
+/* ---------- Bölüm başlıkları ---------- */
+section{position:relative}
+.sec{padding-block:112px}
+.sec h2.disp{font-size:clamp(46px,7.4vw,112px)}
+.eyebrow{margin:0 0 20px;color:var(--muted)}
+.lede{max-width:520px;margin:24px 0 0;font-size:19px;color:var(--muted)}
+.band-ink{background:var(--ink);color:var(--gray)}
+.band-ink .eyebrow,.band-ink .lede{color:var(--soft)}
+.band-ink .eyebrow{color:var(--lime)}
+.band-lime{background:var(--lime)}
+.band-lime .eyebrow,.band-lime .lede{color:#1d2a00}
+
+/* ---------- Bento ---------- */
+.bento{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px;margin-top:56px}
+.tile{position:relative;min-width:0;padding:28px;display:flex;flex-direction:column;gap:18px;background:var(--white);overflow:hidden;border:1px solid var(--ink)}
+.tile h3{margin:0;font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(30px,3vw,42px);line-height:.96;letter-spacing:-.01em;text-transform:uppercase}
+.tile p{margin:0;max-width:34em;font-size:16px}
+.t1{grid-column:span 4;background:var(--lime)}
+.t2{grid-column:span 2;background:var(--ink);color:var(--gray)}
+.t3,.t4,.t5{grid-column:span 2}
+.t4{background:var(--mint)}
+.t5{background:var(--sky)}
+.mini{background:#0b0d0b;color:#e8efe5;font-family:var(--mono);padding:14px;display:flex;flex-direction:column;gap:10px}
+.vrow{display:flex;align-items:center;gap:10px;padding:5px 8px;border:2px solid transparent;font-size:14px}
+.vrow .av{width:28px;height:28px;border-radius:50%;background:var(--c);color:#0a0d0a;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px}
+.vrow .vn{flex:1}
+.vrow .bars{display:inline-flex;gap:2px;align-items:flex-end;height:14px;opacity:0}
+.vrow .bars i{width:3px;height:5px;background:var(--lime);display:block}
+.vrow.on{border-color:var(--lime)}
+.vrow.on .bars{opacity:1}
+.vrow.on .bars i{animation:eq 700ms ease-in-out infinite}
+.vrow.on .bars i:nth-child(2){animation-delay:-.2s}.vrow.on .bars i:nth-child(3){animation-delay:-.45s}
+.vrow.auto{animation:vspeak 6s steps(1) infinite}
+.vrow.auto:nth-child(2){animation-delay:-2s}.vrow.auto:nth-child(3){animation-delay:-4s}
+@keyframes vspeak{0%{border-color:var(--lime)}30%,100%{border-color:transparent}}
+.vrow.auto .bars{animation:vbars 6s steps(1) infinite;animation-delay:inherit}
+@keyframes vbars{0%{opacity:1}30%,100%{opacity:0}}
+.vrow.auto .bars i{animation:eq 700ms ease-in-out infinite}
+.mpads{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.mp{height:44px;padding:0 14px;border:0;background:var(--c);color:#0a0d0a;font-family:var(--mono);font-weight:700;font-size:12px;cursor:pointer}
+.mp:active,.mp.go{transform:translateY(2px);filter:brightness(1.2)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:44px;padding:0 16px;background:transparent;border:1px solid #4a5a4a;color:var(--gray);font-family:var(--display);font-weight:800;font-stretch:80%;font-size:19px;text-transform:uppercase;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--lime);border-color:var(--lime);color:var(--ink)}
+.orow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#f4f6f7;border:1px solid var(--ink);font-size:14px}
+.orow .ti{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orow .cc{font-family:var(--mono);font-weight:700;font-size:10px;letter-spacing:.08em;border:1px solid var(--ink);padding:1px 6px}
+.orow button{width:44px;height:44px;border:0;background:var(--ink);color:var(--lime);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.orow button.go{background:var(--coral);color:var(--ink)}
+.srch2{height:44px;border:1px solid var(--ink);background:#fff;display:flex;align-items:center;padding:0 12px;font-family:var(--mono);font-size:13px}
+.wave{display:flex;align-items:center;gap:3px;height:70px;background:#0b0d0b;padding:0 12px;position:relative}
+.wave i{display:block;flex:1;min-width:2px;background:var(--mint);border-radius:1px}
+.wave::before,.wave::after{content:"";position:absolute;top:6px;bottom:6px;width:3px;background:var(--lime)}
+.wave::before{left:22%}.wave::after{right:18%}
+.sl{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-weight:700;font-size:12px}
+.sl .tr{flex:1;height:6px;background:rgba(10,13,10,.25);position:relative}
+.sl .tr u{position:absolute;left:0;top:0;bottom:0;background:var(--ink)}
+.url{font-family:var(--mono);font-size:13px;padding:10px 12px;background:#0b0d0b;color:var(--lime);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev{font-family:var(--mono);font-size:13px;padding:8px 12px;background:rgba(10,13,10,.12)}
+.ev b{font-weight:700}
+
+/* ---------- Fiyat / fiş ---------- */
+.fiyat{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,5fr);gap:72px;align-items:center}
+.fiyat h2.disp{font-size:clamp(56px,9vw,140px)}
+.fiyat .copy{display:flex;flex-direction:column;gap:24px;min-width:0}
+.receipt{position:relative;width:100%;max-width:460px;justify-self:center;background:#fff;color:var(--ink);font-family:var(--mono);padding:30px 28px 34px;border:2px solid var(--ink);box-shadow:12px 12px 0 var(--ink);transform:rotate(1.8deg)}
+.receipt::after{content:"";position:absolute;left:-2px;right:-2px;bottom:-15px;height:14px;background:radial-gradient(circle at 10px -3px,transparent 8px,#fff 8.6px) repeat-x;background-size:20px 14px;filter:drop-shadow(0 2px 0 var(--ink))}
+.receipt.print{animation:print 1.6s steps(24) both}
+@keyframes print{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 -20px 0)}}
+.receipt h3{margin:0;text-align:center;font-weight:700;font-size:20px;letter-spacing:.2em}
+.receipt .sub{text-align:center;font-size:12px;letter-spacing:.1em;color:#4a5258;margin:4px 0 14px}
+.receipt hr{border:0;border-top:2px dashed var(--ink);margin:12px 0}
+.rl{display:flex;align-items:baseline;gap:8px;font-size:14px;padding:5px 0}
+.rl i{flex:1;border-bottom:2px dotted #9aa3a8;transform:translateY(-3px)}
+.rl b{font-weight:700;white-space:nowrap}
+.rl.sm{font-size:13px;color:#4a5258}
+.rl.tot{font-size:30px;font-weight:700;padding-top:8px}
+.rl.tot b{background:var(--lime);padding:0 8px}
+.receipt .thx{text-align:center;font-size:12px;letter-spacing:.08em;margin-top:16px}
+
+/* ---------- Showcase pencereleri ---------- */
+.show{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:72px;align-items:center}
+.show.flip{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
+.show .copy{display:flex;flex-direction:column;gap:20px;min-width:0}
+.show h2.disp{font-size:clamp(46px,6vw,92px)}
+.copy ul{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.copy li{display:flex;gap:12px;align-items:baseline}
+.copy li::before{content:"";flex:none;width:10px;height:10px;background:var(--lime);transform:translateY(1px)}
+.band-lime .copy li::before{background:var(--ink)}
+.light .copy li::before{background:var(--ink)}
+.frame{position:relative;min-width:0;padding:10px;background:#0b0d0b;border:2px solid var(--ink);box-shadow:14px 14px 0 var(--ink);transform:rotate(-1.6deg)}
+.frame.r{transform:rotate(1.6deg)}
+.band-ink .frame{border-color:var(--lime);box-shadow:14px 14px 0 var(--lime)}
+.scr{position:relative;width:100%;aspect-ratio:16/10;overflow:hidden;background:#070907}
+.scr .mi{position:absolute;left:0;top:0;width:640px;height:400px;transform-origin:0 0;overflow:hidden;font-family:var(--body);font-size:15px;color:#e8efe5;--muted:#9fb09c}
+.listen{margin-top:6px;align-self:flex-start}
+.listen[aria-pressed="true"]{background:var(--lime);color:var(--ink);border-color:var(--ink)}
+.band-ink .listen{color:var(--gray);border-color:var(--soft)}
+.band-ink .listen[aria-pressed="true"]{border-color:var(--lime)}
+
+/* ---------- Adımlar ---------- */
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-top:56px}
+.step{background:var(--white);border:1px solid var(--ink);padding:24px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.step .n{font-family:var(--display);font-weight:800;font-stretch:75%;font-size:84px;line-height:.8;color:var(--lime);-webkit-text-stroke:2px var(--ink)}
+.step h3{margin:0;font-family:var(--display);font-weight:800;font-stretch:80%;font-size:32px;line-height:1;text-transform:uppercase}
+.step p{margin:0;font-size:16px;color:var(--muted)}
+.step .ill{margin-top:auto;background:#0b0d0b;color:#e8efe5;font-family:var(--mono);font-size:12px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.prg{height:8px;background:#1b231b}.prg u{display:block;height:100%;width:72%;background:var(--lime);animation:inst 4s ease-in-out infinite}
+@keyframes inst{0%{width:8%}80%,100%{width:96%}}
+.dev{display:flex;justify-content:space-between;padding:8px 10px;background:#141a14;border:1px solid #232b23}
+.dev.ok{border-color:var(--lime);color:var(--lime)}
+.opt{padding:7px 10px;background:#141a14;color:#8e9c8b}
+.opt.sel{background:rgba(196,255,0,.14);color:var(--lime);outline:1px solid rgba(196,255,0,.5);font-weight:700}
+
+/* ---------- Pado ---------- */
+.pado-sec{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:64px;align-items:center}
+.pado-stage{display:flex;align-items:center;justify-content:center;padding:24px}
+.pado-stage .pado{width:min(100%,460px)}
+.moods{display:flex;flex-wrap:wrap;gap:8px;margin:28px 0 20px}
+.moods button{min-height:44px;padding:0 16px;background:transparent;border:1px solid var(--ink);font-family:var(--mono);font-weight:700;font-size:12px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.moods button[aria-pressed="true"]{background:var(--ink);color:var(--lime)}
+#moodLine{min-height:3.2em;font-size:19px;max-width:30em;margin:0}
+/* Pado */
+.pado{display:block;width:100%;height:auto;overflow:visible;--px:0;--py:0}
+.pado svg{width:100%;height:auto;overflow:visible;display:block;transform-origin:50% 90%}
+.pado .eyes{transform-box:fill-box;transform-origin:center;animation:blink 5.2s infinite}
+.pado .pup{transition:transform .12s ease-out;transform:translate(calc(var(--px)*1px),calc(var(--py)*1px))}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}96%{transform:scaleY(.08)}}
+.pado .fx,.pado .arcs,.pado .slp,.pado .brows{opacity:0;transition:opacity .25s ease}
+.pado .eyes,.pado .bx{transition:opacity .2s ease}
+.pado .brows{transform-box:fill-box}
+.pado.hit svg{animation:pop .32s ease-out}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.07,.94)}100%{transform:scale(1)}}
+.pado[data-mood="play"] svg{animation:bob .62s ease-in-out infinite}
+.pado[data-mood="play"] .nt{opacity:1;animation:rise 1.7s ease-in infinite}
+.pado[data-mood="play"] .nt:nth-of-type(2){animation-delay:-.6s}
+.pado[data-mood="play"] .nt:nth-of-type(3){animation-delay:-1.1s}
+.pado[data-mood="play"] .brows{opacity:1;transform:translateY(-5px)}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-1.2deg)}50%{transform:translateY(-8px) rotate(1.2deg)}}
+@keyframes rise{0%{transform:translateY(8px);opacity:0}20%{opacity:1}100%{transform:translateY(-34px);opacity:0}}
+.pado .nt{opacity:0}
+.pado .mag,.pado .rec,.pado .conf,.pado .zz{opacity:0;transition:opacity .25s ease}
+.pado[data-mood="search"] .mag{opacity:1;animation:sweep 2.2s ease-in-out infinite;transform-origin:150px 150px}
+@keyframes sweep{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(12deg)}}
+.pado[data-mood="rec"] .rec{opacity:1}
+.pado[data-mood="rec"] .rec circle{animation:pulse 1s ease-in-out infinite}
+.pado[data-mood="rec"] .brows{opacity:1}
+@keyframes pulse{50%{opacity:.25}}
+.pado[data-mood="party"] .eyes{opacity:0}
+.pado[data-mood="party"] .arcs{opacity:1}
+.pado[data-mood="party"] svg{animation:bob .5s ease-in-out infinite}
+.pado[data-mood="party"] .conf{opacity:1}
+.pado[data-mood="party"] .conf rect{animation:fall 1.3s ease-in infinite}
+.pado[data-mood="party"] .conf rect:nth-child(2n){animation-delay:-.5s}
+.pado[data-mood="party"] .conf rect:nth-child(3n){animation-delay:-.9s}
+@keyframes fall{0%{transform:translateY(-14px) rotate(0);opacity:0}15%{opacity:1}100%{transform:translateY(60px) rotate(220deg);opacity:0}}
+.pado[data-mood="sleep"] .eyes{opacity:0}
+.pado[data-mood="sleep"] .slp{opacity:1}
+.pado[data-mood="sleep"] svg{animation:breathe 3.4s ease-in-out infinite}
+.pado[data-mood="sleep"] .zz{opacity:1;animation:rise 3s ease-in infinite}
+@keyframes breathe{50%{transform:scale(1.025,.975)}}
+
+
+
+/* ---------- Neden / SSS ---------- */
+.why{margin-top:56px;border-top:2px solid var(--ink)}
+.why .row{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:12px 40px;padding:26px 0;border-bottom:1px solid #b9bfc4;transition:background .2s,padding .2s}
+.why .row:hover{background:var(--lime);padding-inline:16px}
+.why h3{margin:0;font-family:var(--display);font-weight:800;font-stretch:78%;font-size:clamp(30px,3.8vw,52px);line-height:.98;text-transform:uppercase;letter-spacing:-.01em}
+.why p{margin:0;max-width:34em;color:var(--muted)}
+.why .row:hover p{color:var(--ink)}
+.faq{margin-top:48px;border-top:2px solid var(--ink)}
+.faq details{border-bottom:1px solid #b9bfc4}
+.faq summary{list-style:none;cursor:pointer;padding:22px 0;display:flex;justify-content:space-between;gap:20px;font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(24px,2.6vw,34px);line-height:1.05;text-transform:uppercase;min-height:44px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font-family:var(--mono);font-weight:700;font-size:28px;line-height:1}
+.faq details[open] summary::after{content:"–"}
+.faq details p{margin:0 0 24px;max-width:42em;color:var(--muted);font-size:18px}
+
+/* ---------- İndir ---------- */
+.cta{padding-block:120px}
+.cta .big{display:flex;flex-wrap:wrap;gap:40px 56px;align-items:flex-end;justify-content:space-between}
+.cta h2.disp{font-size:clamp(64px,13vw,220px);color:var(--lime);line-height:.82}
+.dl{display:inline-flex;align-items:center;gap:16px;min-height:100px;padding:0 48px;background:var(--lime);color:var(--ink);font-family:var(--display);font-weight:800;font-stretch:78%;font-size:clamp(28px,3.4vw,48px);text-transform:uppercase;box-shadow:10px 10px 0 #3a4a00;transition:transform .12s,box-shadow .12s}
+.dl:hover{transform:translate(-3px,-3px);box-shadow:14px 14px 0 #3a4a00}
+.dlbox{display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.dl2{display:flex;flex-wrap:wrap;gap:12px}
+.dl.alt{min-height:60px;padding:0 26px;font-size:clamp(20px,2vw,26px);box-shadow:6px 6px 0 #3a4a00;background:var(--gray)}
+.dl.alt:hover{box-shadow:9px 9px 0 #3a4a00}
+.ver{margin:0;color:var(--soft)}
+.cta .notes{margin-top:48px;display:flex;flex-wrap:wrap;gap:12px 48px;color:var(--soft);font-size:16px}
+.cta .notes p{margin:0;max-width:30em}
+footer{background:var(--ink);color:var(--gray);border-top:1px solid #1d251d;padding-block:40px 56px}
+footer .cols{display:flex;flex-wrap:wrap;gap:32px 56px}
+footer .col{flex:1 1 260px;min-width:0}
+footer h4{margin:0 0 12px;color:var(--soft)}
+footer ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px;font-size:15px;color:#c3cec0}
+footer a{text-decoration:underline;text-underline-offset:3px}
+.pill{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:70;transform:translateY(140%);transition:transform .3s ease;box-shadow:6px 6px 0 var(--lime);border:2px solid var(--lime)}
+.pill.vis{transform:none}
+
+/* ---------- Ekran içi (oyun / stüdyo) ---------- */
+/* Oyun ekranı */
+.g-sky{position:absolute;inset:0 0 100px 0;background:linear-gradient(#10182a,#1b2b4a 70%,#27406b)}
+.g-ground{position:absolute;left:0;right:0;top:300px;bottom:0;background:#1a2a1a;background-image:repeating-linear-gradient(90deg,#254025 0,#254025 40px,#1a2a1a 40px,#1a2a1a 80px);border-top:4px solid #3c6a2c}
+.g-player{position:absolute;left:120px;top:260px;width:34px;height:40px;background:var(--lime);border-radius:6px}
+.g-player i{position:absolute;top:10px;width:7px;height:12px;background:#0a0d0a;border-radius:3px}
+.g-player i:first-child{left:7px}.g-player i:last-child{right:7px}
+.g-obs{position:absolute;left:700px;top:266px;width:0;height:0;border-left:19px solid transparent;border-right:19px solid transparent;border-bottom:34px solid var(--coral)}
+.g-boom{position:absolute;left:96px;top:196px;color:var(--coral);font-size:22px;font-weight:700;opacity:0}
+.g-hud{position:absolute;left:14px;top:12px;color:#cfe0cc;font-size:14px}
+.vc{position:absolute;right:12px;top:12px;width:176px;background:rgba(10,13,10,.82);border:1px solid #2a352a;padding:10px;display:flex;flex-direction:column;gap:8px}
+.vch{font-size:11px;color:var(--muted)}
+.vr{display:flex;align-items:center;gap:8px;padding:4px;border:2px solid transparent}
+.vr .av{width:30px;height:30px;border-radius:50%;background:var(--c);color:#0a0d0a;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px}
+.vr .vn{flex:1;font-size:15px}
+.vr .bars{display:inline-flex;gap:2px;align-items:flex-end;height:14px;opacity:0}
+.vr .bars i{width:3px;height:5px;background:var(--lime);display:block}
+.vr.on{border-color:var(--lime)}
+.vr.on .bars{opacity:1}
+.vr.on .bars i{animation:eq 700ms ease-in-out infinite}
+.vr.on .bars i:nth-child(2){animation-delay:-.2s}.vr.on .bars i:nth-child(3){animation-delay:-.45s}
+.say{position:absolute;left:14px;bottom:62px;max-width:380px;background:rgba(10,13,10,.8);padding:6px 12px;font-size:15px;opacity:0;transition:opacity .2s}
+.say.on{opacity:1}
+.say b{color:var(--lime)}
+.padbar{position:absolute;left:0;right:0;bottom:0;height:50px;background:#0b0f0b;border-top:1px solid #2a352a;display:flex;align-items:center;gap:8px;padding:0 12px}
+.pb{height:32px;padding:0 12px;display:flex;align-items:center;background:#1b231b;border:1px solid #2f3b2f;color:#9fb09c;font-size:14px;font-weight:600}
+.pb.on{background:var(--c);color:#0a0d0a;border-color:var(--c);transform:translateY(2px)}
+.toast{margin-left:auto;font-size:12px;color:var(--lime);opacity:0}
+.toast.on{opacity:1}
+
+/* Stüdyo ekranı */
+.mi .st-top{position:absolute;left:0;right:0;top:0;height:40px;background:#0c110c;border-bottom:1px solid #2a352a}
+.mi .st-top b{position:absolute;left:14px;top:11px;font-size:13px;color:var(--lime)}
+.stb{position:absolute;top:8px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;background:#1b231b;border:1px solid #2f3b2f;color:#cfe0cc}
+.rb{left:300px;width:100px}.stb:nth-of-type(2){left:410px;width:90px}.mg{left:510px;width:112px}
+.rb.on{background:#3a1410;border-color:var(--coral);color:var(--coral);animation:pulse 1s ease-in-out infinite}
+.mg.on{background:var(--lime);color:#0a0d0a;border-color:var(--lime)}
+.stb.act{background:#233023;border-color:var(--lime);color:var(--lime)}
+.st-lib{position:absolute;left:0;top:41px;bottom:50px;width:140px;background:#0b0f0b;border-right:1px solid #2a352a;padding:14px 12px;display:flex;flex-direction:column;gap:8px}
+.st-lib .lh{font-size:11px;color:var(--muted);margin-bottom:2px}
+.lc{height:32px;padding:0 10px;display:flex;align-items:center;background:var(--c);color:#0a0d0a;font-weight:700;font-size:14px}
+.st-lane{position:absolute;left:150px;right:10px;height:64px;background:#101610;border:1px solid #232c23}
+.sc{position:absolute;height:48px;background:var(--c);color:#0a0d0a;font-weight:700;font-size:13px;padding:3px 7px;overflow:hidden}
+.sc-rec{left:158px;top:68px;width:0}
+.sc.fire{filter:brightness(1.45)}
+.wv{position:absolute;left:6px;right:6px;bottom:4px;height:24px;display:flex;align-items:center;gap:2px}
+.wv i{flex:0 0 3px;background:rgba(10,13,10,.7);display:block}
+.ph{position:absolute;top:56px;height:224px;width:2px;background:var(--lime);box-shadow:0 0 10px var(--lime);left:158px;opacity:0}
+.st-bar{position:absolute;left:0;right:0;bottom:0;height:50px;background:#0b0f0b;border-top:1px solid #2a352a;display:flex;align-items:center;gap:14px;padding:0 14px}
+.prog{flex:1;height:8px;background:#1b231b}
+.prog div{height:100%;width:0;background:var(--lime)}
+.st-bar span{font-size:12px;color:var(--muted);min-width:150px;text-align:right}
+.cur{position:absolute;left:0;top:0;z-index:6;pointer-events:none}
+.done{position:absolute;right:20px;bottom:64px;background:var(--lime);color:#0a0d0a;padding:10px 16px;display:flex;flex-direction:column;opacity:0;transform:translateY(10px);transition:opacity .25s,transform .25s}
+.done b{font-size:17px}.done span{font-size:11px}
+.done.on{opacity:1;transform:none}
+.cf{position:absolute;inset:0;pointer-events:none}
+.cf i{position:absolute;top:-10px;width:8px;height:14px;opacity:0}
+.cf.go i{animation:cfall 1.6s ease-in forwards}
+@keyframes cfall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(380px) rotate(520deg)}}
+@media(prefers-reduced-motion:reduce){.cf.go i{animation:none}.rb.on{animation:none}}
+
+
+
+/* ---------- Duyarlı ---------- */
+@media(max-width:1000px){
+  .hero{height:auto}
+  .hero .top{position:relative;height:auto;padding-bottom:calc(var(--u)*30)}
+  .hero .stage,.hero .stage2{position:static;width:auto;height:auto;transform:none}
+  .hnav{position:static;padding:20px max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+  .hnav .links{display:none}
+  .hnav .snd span{display:none}
+  .wm{position:static;padding:14px 0 0 max(8px,env(safe-area-inset-left,0px));font-size:22.4vw}
+  .stage2{padding:36px max(16px,env(safe-area-inset-right,0px)) 56px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:36px}
+  .htext{position:static;width:auto;gap:22px}
+  .htext h2{font-size:clamp(48px,13vw,76px)}
+  .htext p{font-size:18px}
+  .sticker{display:none}
+  .hwin{position:static;width:100%;transform:none}
+  .hwin .shell{box-shadow:8px 8px 0 var(--ink)}
+  .sec{padding-block:72px}
+  .bento{grid-template-columns:minmax(0,1fr)}
+  .t1,.t2,.t3,.t4,.t5{grid-column:auto}
+  .show,.show.flip,.fiyat{grid-template-columns:minmax(0,1fr);gap:48px}
+  .receipt{transform:none;box-shadow:8px 8px 0 var(--ink)}
+  .frame,.frame.r{transform:none;box-shadow:8px 8px 0 var(--ink)}
+  .band-ink .frame{box-shadow:8px 8px 0 var(--lime)}
+  .steps{grid-template-columns:minmax(0,1fr)}
+  .pado-sec{grid-template-columns:minmax(0,1fr);gap:24px}
+  .why .row{grid-template-columns:minmax(0,1fr)}
+  .cta{padding-block:80px}
+  .dl{min-height:84px;padding:0 32px}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .marquee .run,.snd i b,.prg u,.vrow.auto,.vrow.auto .bars,.vrow .bars i{animation:none!important}
+  .pado *,.pado svg{animation:none!important}
+}
+</style>
+
+</head>
+<body>
+<header class="hero" id="top">
+  <div class="top">
+    <div class="stage">
+      <div class="hnav">
+        <span>PADOBOARD</span>
+        <span class="links"><a href="#ozellikler">ÖZELLİKLER</a><a href="#stüdyo">STÜDYO</a><a href="#fiyat">FİYAT</a><a href="#pado">PADO</a><a href="#sss">SSS</a><a href="https://github.com/elifnurdemir/soundboard" target="_blank" rel="noopener">GITHUB</a></span>
+        <button class="snd" id="sndBtn" type="button" aria-pressed="false" aria-label="Sesi aç veya kapat"><i aria-hidden="true"><b></b><b></b><b></b></i><span id="sndTxt">SES KAPALI</span></button>
+        <a class="btn sm" href="#indir" style="margin-left:0">İNDİR</a>
+      </div>
+      <h1 class="wm">PADOBOARD</h1>
+    </div>
+  </div>
+  <div class="stage2">
+    <div class="htext">
+      <h2>Tüm sesler,<br><mark>tek tuşta.</mark></h2>
+      <p>Ses çalmak, sesini değiştirmek, kayıt almak. Hepsi ücretsiz. Abonelik, Pro sürüm ya da hesap yok.</p>
+      <div class="hbtns">
+        <a class="btn" href="#indir" data-os-label>WINDOWS İÇİN İNDİR</a>
+        <a class="btn line" href="https://github.com/elifnurdemir/soundboard" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+    <svg class="sticker" id="sticker" viewBox="0 0 240 200" aria-hidden="true">
+      <path d="M56 78Q120-14 184 78" fill="none" stroke="#0a0d0a" stroke-width="12" stroke-linecap="round"/>
+      <rect x="12" y="92" width="30" height="70" rx="15" fill="#0a0d0a"/><rect x="198" y="92" width="30" height="70" rx="15" fill="#0a0d0a"/>
+      <rect x="46" y="58" width="148" height="122" rx="40" fill="#0a0d0a"/>
+      <rect x="82" y="96" width="28" height="50" rx="14" fill="#c4ff00"/><rect x="130" y="96" width="28" height="50" rx="14" fill="#c4ff00"/>
+      <rect x="89" y="108" width="14" height="26" rx="7" fill="#0a0d0a" opacity=".7"/><rect x="137" y="108" width="14" height="26" rx="7" fill="#0a0d0a" opacity=".7"/>
+    </svg>
+    <div class="hwin" id="hwin">
+      <div class="shell" id="hshell"><div class="inner" id="hinner">
+        <div class="appwin" id="appwin">
+          <div class="tb">
+            <svg width="24" height="24" viewBox="0 0 26 26" aria-hidden="true"><rect x="2" y="2" width="6" height="6" rx="1" fill="#c4ff00"/><rect x="10" y="2" width="6" height="6" rx="1" fill="#2a5a2a"/><rect x="18" y="2" width="6" height="6" rx="1" fill="#1a2a1a"/><rect x="2" y="10" width="6" height="6" rx="1" fill="#1a2a1a"/><rect x="10" y="10" width="6" height="6" rx="1" fill="#c4ff00"/><rect x="18" y="10" width="6" height="6" rx="1" fill="#2a5a2a"/><rect x="2" y="18" width="6" height="6" rx="1" fill="#2a5a2a"/><rect x="10" y="18" width="6" height="6" rx="1" fill="#1a2a1a"/><rect x="18" y="18" width="6" height="6" rx="1" fill="#c4ff00"/></svg>
+            <span class="nm">PADOBOARD</span>
+            <span class="srch">Ses ara...</span>
+            <span class="play" id="apPlay">● 1 ÇALIYOR</span>
+            <div class="acts"><span style="background:#d93a3a;color:#fff">■ DURDUR</span><span style="color:#8e9c8b">≡ STÜDYO</span><span style="background:#c4ff00;color:#0a0d0a">+ SES EKLE</span></div>
+          </div>
+          <div class="body">
+            <div class="side">
+              <div style="padding:10px;background:rgba(196,255,0,.08);border:1px solid rgba(196,255,0,.35);display:flex;flex-direction:column;gap:3px"><span style="font-size:12px;font-weight:700;color:#c4ff00">Çevrimiçi Sesler</span><span style="font-size:10px;color:#8e9c8b">Openverse · CC0</span></div>
+              <div style="margin-top:8px;font-size:10px;letter-spacing:.14em;color:#8e9c8b">KATEGORİLER</div>
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 8px;font-size:12px;background:#161c16"><span style="width:8px;height:8px;background:#e8efe5"></span><span style="flex:1">Tümü</span><span style="font-size:10px;color:#8e9c8b">24</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 8px;font-size:12px;color:#b9c6b6"><span style="width:8px;height:8px;background:#ff5a3c"></span><span style="flex:1">Oyun</span><span style="font-size:10px;color:#8e9c8b">8</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 8px;font-size:12px;color:#b9c6b6"><span style="width:8px;height:8px;background:#ffb020"></span><span style="flex:1">Meme</span><span style="font-size:10px;color:#8e9c8b">7</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 8px;font-size:12px;color:#b9c6b6"><span style="width:8px;height:8px;background:#4aa3ff"></span><span style="flex:1">Efekt</span><span style="font-size:10px;color:#8e9c8b">6</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 8px;font-size:12px;color:#b9c6b6"><span style="width:8px;height:8px;background:#9b6bff"></span><span style="flex:1">Müzik</span><span style="font-size:10px;color:#8e9c8b">3</span></div>
+            </div>
+            <div class="grid" id="apGrid"></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</header>
+
+<div class="marquee" aria-hidden="true">
+  <div class="tilt" id="tilt">
+    <div class="run"><span>Airhorn</span><span>Alkış</span><span>Davul</span><span>Kapı</span><span>Yağmur</span><span>Kahkaha</span><span>Zil</span><span>Patlama</span><span>Whoosh</span><span>Bip</span><span>Lazer</span></div>
+    <div class="run" aria-hidden="true"><span>Airhorn</span><span>Alkış</span><span>Davul</span><span>Kapı</span><span>Yağmur</span><span>Kahkaha</span><span>Zil</span><span>Patlama</span><span>Whoosh</span><span>Bip</span><span>Lazer</span></div>
+  </div>
+</div>
+
+<main>
+<!-- Özellikler -->
+<section class="sec" id="ozellikler">
+  <div class="wrap">
+    <p class="mono eyebrow">Neler var</p>
+    <h2 class="disp">Hepsi tek<br>pencerede.</h2>
+    <div class="bento">
+      <article class="tile t1">
+        <h3>Arkadaşların duyar</h3>
+        <p>Ses hem kulaklığına hem sanal kabloya gider. Discord, Steam ya da oyunun sesli sohbeti seni mikrofon gibi duyar. Bir pada bas, denemesi bedava.</p>
+        <div class="mini">
+          <div class="vrow auto"><span class="av" style="--c:var(--sky)">C</span><span class="vn">Can</span><span class="bars"><i></i><i></i><i></i></span></div>
+          <div class="vrow auto"><span class="av" style="--c:var(--pink)">E</span><span class="vn">Ece</span><span class="bars"><i></i><i></i><i></i></span></div>
+          <div class="vrow" id="youRow"><span class="av" style="--c:var(--lime)">S</span><span class="vn">Sen</span><span class="bars"><i></i><i></i><i></i></span></div>
+          <div class="mpads">
+            <button class="mp" type="button" data-s="airhorn" style="--c:var(--coral)">Airhorn</button>
+            <button class="mp" type="button" data-s="zil" style="--c:var(--amber)">Zil</button>
+            <button class="mp" type="button" data-s="davul" style="--c:var(--sky)">Davul</button>
+            <button class="mp" type="button" data-s="bip" style="--c:var(--mint)">Bip</button>
+          </div>
+        </div>
+      </article>
+      <article class="tile t2">
+        <h3>Ses değiştirici</h3>
+        <p>Mikrofonuna efekt ekle. Bir ayar seç, kısa bir melodiyle dene.</p>
+        <div class="chips" id="chips" role="group" aria-label="Ses ayarı"></div>
+      </article>
+      <article class="tile t3">
+        <h3>Çevrimiçi sesler</h3>
+        <p>Telifsiz (CC0) kütüphanede ara, önce dinle, beğendiğini ekle.</p>
+        <div class="srch2" aria-hidden="true">airhorn</div>
+        <div class="orow"><span class="ti">Air horn, kısa</span><span class="cc">CC0</span><button type="button" data-s="airhorn" aria-label="Air horn önizle"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></div>
+        <div class="orow"><span class="ti">Küçük zil</span><span class="cc">CC0</span><button type="button" data-s="zil" aria-label="Küçük zil önizle"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></div>
+        <div class="orow"><span class="ti">Hızlı whoosh</span><span class="cc">CC0</span><button type="button" data-s="whoosh" aria-label="Whoosh önizle"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></div>
+      </article>
+      <article class="tile t4">
+        <h3>Her sese kendi ayarı</h3>
+        <p>Ses seviyesi %500'e kadar, bas, tiz, yankı, kırpma ve solma.</p>
+        <div class="wave" id="wave" aria-hidden="true"></div>
+        <div class="sl" aria-hidden="true"><span>SES</span><span class="tr"><u style="width:78%"></u></span><span>%380</span></div>
+        <div class="sl" aria-hidden="true"><span>BAS</span><span class="tr"><u style="width:58%"></u></span><span>+6 dB</span></div>
+      </article>
+      <article class="tile t5">
+        <h3>Ortak oda</h3>
+        <p>Arkadaşların bağlantıyı tarayıcıda açıp sana ses çaldırır. Onlar bir şey kurmaz.</p>
+        <div class="url" aria-hidden="true">192.168.1.20:7777/oda?k=••••••</div>
+        <div class="ev" aria-hidden="true"><b>Ece</b> katıldı</div>
+        <div class="ev" aria-hidden="true"><b>Can</b> Zil çaldı</div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- Fiyat: fiş -->
+<section class="sec band-lime" id="fiyat">
+  <div class="wrap">
+    <div class="fiyat">
+      <div class="copy">
+        <p class="mono eyebrow" style="margin:0">Fiyat</p>
+        <h2 class="disp">Hesap kaç?<br>Sıfır.</h2>
+        <p class="lede" style="margin:0;font-size:22px;max-width:520px;color:var(--ink)">Ses çalmak için abonelik yok. Ses değiştirmek için Pro yok. Bir butona basmak için ödeme yok.</p>
+        <div class="hbtns"><a class="btn" href="#indir">Ücretsiz indir</a><a class="btn line" href="https://github.com/elifnurdemir/soundboard" target="_blank" rel="noopener">Kodu gör</a></div>
+      </div>
+      <div class="receipt" id="receipt" role="img" aria-label="Fiş: her özellik 0,00 lira, toplam 0,00 lira">
+        <h3>PADOBOARD</h3>
+        <div class="sub">FİŞ NO 0001 · TEŞEKKÜRLER</div>
+        <hr>
+        <div class="rl"><span>Sınırsız ses butonu</span><i></i><b>0,00 ₺</b></div>
+        <div class="rl"><span>Kısayol tuşları</span><i></i><b>0,00 ₺</b></div>
+        <div class="rl"><span>Ses değiştirici</span><i></i><b>0,00 ₺</b></div>
+        <div class="rl"><span>Stüdyo, kayıt, MP3</span><i></i><b>0,00 ₺</b></div>
+        <div class="rl"><span>Çevrimiçi ses kütüphanesi</span><i></i><b>0,00 ₺</b></div>
+        <div class="rl"><span>Ortak oda</span><i></i><b>0,00 ₺</b></div>
+        <div class="rl"><span>Videodan MP3</span><i></i><b>0,00 ₺</b></div>
+        <div class="rl"><span>Otomatik güncelleme</span><i></i><b>0,00 ₺</b></div>
+        <hr>
+        <div class="rl sm"><span>Aylık abonelik</span><i></i><b>yok</b></div>
+        <div class="rl sm"><span>Pro sürüm</span><i></i><b>yok</b></div>
+        <div class="rl sm"><span>Hesap, reklam, takip</span><i></i><b>yok</b></div>
+        <hr>
+        <div class="rl tot"><span>TOPLAM</span><i></i><b>0,00 ₺</b></div>
+        <div class="thx">BİR DAHA ÖDEME YOK</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Oyundayken -->
+<section class="sec light" id="oyun" style="background:var(--white);border-block:1px solid var(--ink)">
+  <div class="wrap">
+    <div class="show">
+      <div class="copy">
+        <p class="mono eyebrow" style="margin:0">Oyundayken</p>
+        <h2 class="disp">Sen bastın.<br>Onlar güldü.</h2>
+        <p class="lede" style="margin:0">Oyun açıkken pencereyi değiştirmeden tek tuşla ses çal. Kısayol tuşları oyunun içinde de çalışır.</p>
+        <ul>
+          <li>Sesin kulaklığına ve sanal kabloya aynı anda gider.</li>
+          <li>Ses seviyesini her buton için ayrı ayarlarsın.</li>
+          <li>Kayıt almadan, ek bir program açmadan.</li>
+        </ul>
+        <button class="btn line sm listen" type="button" data-mon="1" aria-pressed="false">Sesini dinle</button>
+      </div>
+      <div class="frame" id="mon1"><div class="scr" id="scr1"><div class="mi" id="mi1">
+            <div class="g-sky"></div>
+            <div class="g-ground" id="gGround"></div>
+            <div class="g-player" id="gPlayer"><i></i><i></i></div>
+            <div class="g-obs" id="gObs"></div>
+            <div class="g-boom mono" id="gBoom">ÇARPTI</div>
+            <div class="g-hud mono">SKOR 0240</div>
+            <aside class="vc">
+              <div class="vch mono">Ses kanalı</div>
+              <div class="vr" id="vrCan"><span class="av" style="--c:var(--sky)">C</span><span class="vn">Can</span><span class="bars"><i></i><i></i><i></i></span></div>
+              <div class="vr" id="vrEce"><span class="av" style="--c:var(--pink)">E</span><span class="vn">Ece</span><span class="bars"><i></i><i></i><i></i></span></div>
+              <div class="vr" id="vrYou"><span class="av" style="--c:var(--lime)">S</span><span class="vn">Sen</span><span class="bars"><i></i><i></i><i></i></span></div>
+            </aside>
+            <div class="say" id="say"></div>
+            <div class="padbar">
+              <span class="pb" id="pbAir" style="--c:var(--coral)">Airhorn</span>
+              <span class="pb" id="pbZil" style="--c:var(--amber)">Zil</span>
+              <span class="pb" style="--c:var(--sky)">Davul</span>
+              <span class="pb" style="--c:var(--mint)">Bip</span>
+              <span class="toast mono" id="toast1"></span>
+            </div>
+          </div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Stüdyo -->
+<section class="sec band-ink" id="stüdyo">
+  <div class="wrap">
+    <div class="show flip">
+      <div class="frame r" id="mon2"><div class="scr" id="scr2"><div class="mi" id="mi2">
+            <div class="st-top">
+              <b class="mono">Stüdyo</b>
+              <span class="stb rb" id="stRec">● Kayıt</span>
+              <span class="stb" id="stPlay2">▶ Çal</span>
+              <span class="stb mg" id="stMerge">Birleştir</span>
+            </div>
+            <div class="st-lib">
+              <span class="lh mono">Kütüphane</span>
+              <span class="lc" style="--c:var(--coral)">Airhorn</span>
+              <span class="lc" style="--c:var(--amber)">Zil</span>
+              <span class="lc" style="--c:var(--sky)">Davul</span>
+            </div>
+            <div class="st-lane" style="top:60px"></div>
+            <div class="st-lane" style="top:134px"></div>
+            <div class="st-lane" style="top:208px"></div>
+            <div class="sc sc-rec" id="clipRec" style="--c:var(--mint)"><span>Kayıt</span><div class="wv" id="wvRec"></div></div>
+            <div class="sc" id="clipAir" style="--c:var(--coral);left:170px;top:142px;width:96px;opacity:0"><span>Airhorn</span></div>
+            <div class="sc" style="--c:var(--amber);left:400px;top:142px;width:96px"><span>Zil</span></div>
+            <div class="sc" id="cD1" style="--c:var(--sky);left:190px;top:216px;width:60px"><span>Davul</span></div>
+            <div class="sc" id="cD2" style="--c:var(--sky);left:270px;top:216px;width:60px"><span>Davul</span></div>
+            <div class="sc" id="cD3" style="--c:var(--sky);left:350px;top:216px;width:60px"><span>Davul</span></div>
+            <div class="ph" id="stHead"></div>
+            <div class="st-bar"><div class="prog"><div id="stProg"></div></div><span class="mono" id="stMsg">Hazır</span></div>
+            <div class="cur" id="stCur"><svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true"><path d="M2 2l16 13-7 1.5 4 8-3.5 1.6-4-8L2 22z" fill="#f4f8f2" stroke="#0a0d0a" stroke-width="2" stroke-linejoin="round"/></svg></div>
+            <div class="done" id="stDone"><b>kolaj.mp3</b><span class="mono">hazır</span></div>
+            <div class="cf" id="stConf"></div>
+          </div></div></div>
+      <div class="copy">
+        <p class="mono eyebrow" style="margin:0">Stüdyo</p>
+        <h2 class="disp">Kaydet. Sürükle.<br><span style="color:var(--lime)">Birleştir.</span></h2>
+        <p class="lede" style="margin:0">Çok kanallı ses editörü, soundboard'un içinde. Kendi sesini yap, MP3 olarak çıkar.</p>
+        <ul>
+          <li>Mikrofonla kayıt al, parçaları kanallara diz.</li>
+          <li>Kütüphaneden ya da çevrimiçi sesten sürükle bırak.</li>
+          <li>Birleştir, MP3 olarak dışa aktar.</li>
+        </ul>
+        <button class="btn line sm listen" type="button" data-mon="2" aria-pressed="false">Sesini dinle</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Adımlar -->
+<section class="sec" id="nasil">
+  <div class="wrap">
+    <p class="mono eyebrow">Nasıl çalışır</p>
+    <h2 class="disp">Üç adımda<br>hazır.</h2>
+    <div class="steps">
+      <article class="step">
+        <span class="n" aria-hidden="true">1</span>
+        <h3>Kur</h3>
+        <p>Kurulum dosyasını indir ve çalıştır. İlk açılışta Padoboard seni yönlendirir.</p>
+        <div class="ill" aria-hidden="true"><div class="dev"><span>Padoboard Setup.exe</span><span>~</span></div><div class="prg"><u></u></div></div>
+      </article>
+      <article class="step">
+        <span class="n" aria-hidden="true">2</span>
+        <h3>Sanal mikrofonu hazırla</h3>
+        <p>Windows'ta sanal kablo, Linux'ta sanal mikrofon: tek tuşla kurulur. Test sesiyle doğrularsın, hoparlöründe bip duyarsın.</p>
+        <div class="ill" aria-hidden="true"><div class="dev ok"><span>CABLE Input</span><span>✓ bulundu</span></div><div class="dev"><span>Test sesi</span><span>▶</span></div></div>
+      </article>
+      <article class="step">
+        <span class="n" aria-hidden="true">3</span>
+        <h3>Mikrofonu seç</h3>
+        <p>Discord, Steam ya da oyunda giriş aygıtını seç: Windows'ta CABLE Output, Linux'ta Padoboard Mikrofon. Rehber menüyü gösterir.</p>
+        <div class="ill" aria-hidden="true"><div class="opt">Varsayılan</div><div class="opt">Mikrofon (Realtek)</div><div class="opt sel">CABLE Output (VB-Audio Virtual Cable) ✓</div></div>
+      </article>
+    </div>
+    <p style="margin:32px 0 0;font-size:14px;color:var(--muted)">Windows'ta sanal kablo olarak VB-CABLE kullanılır (VB-Audio, bağışla desteklenen yazılım). Linux'ta PulseAudio ya da PipeWire üzerinden <code>pactl</code> ile çalışır, sürücü gerekmez.</p>
+  </div>
+</section>
+
+<!-- Pado -->
+<section class="sec band-lime" id="pado">
+  <div class="wrap">
+    <div class="pado-sec">
+      <div class="pado-stage" id="padoSlot"></div>
+      <div>
+        <p class="mono eyebrow" style="margin:0 0 20px">Maskot</p>
+        <h2 class="disp">Pado'yu<br>tanı.</h2>
+        <div class="moods" id="moods" role="group" aria-label="Pado'nun ruh hali"></div>
+        <p id="moodLine" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Neden -->
+<section class="sec" id="neden">
+  <div class="wrap">
+    <p class="mono eyebrow">Neden Padoboard</p>
+    <h2 class="disp">Basit bir söz.</h2>
+    <div class="why">
+      <div class="row"><h3>Hiçbir şey kilitli değil</h3><p>Ses değiştirici, Stüdyo, çevrimiçi kütüphane, ortak oda: hepsi ilk günden açık. Pro sürüm ya da abonelik yok.</p></div>
+      <div class="row"><h3>Açık kaynak, hesapsız</h3><p>Kod GitHub'da MIT lisansıyla açık. Hesap açmazsın, telemetri yok, verilerin bilgisayarında kalır.</p></div>
+      <div class="row"><h3>Soundboard ve editör bir arada</h3><p>Kayıt al, çok kanalda düzenle, birleştir, MP3 yap. Ayrı program açmana gerek yok.</p></div>
+      <div class="row"><h3>İndirmeden dinle</h3><p>Çevrimiçi CC0 sesleri önce dinlersin, beğendiğini eklersin. Kaynak bilgisi sesle birlikte saklanır.</p></div>
+      <div class="row"><h3>Ortak oda</h3><p>Arkadaşların bağlantıyı tarayıcıda açıp sana ses çaldırabilir. Onların uygulama kurması gerekmez.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- SSS -->
+<section class="sec" id="sss" style="background:var(--gray2);border-top:1px solid var(--ink)">
+  <div class="wrap" style="max-width:960px">
+    <p class="mono eyebrow">Sık sorulanlar</p>
+    <h2 class="disp">Merak<br>edilenler.</h2>
+    <div class="faq">
+      <details open><summary>Gerçekten ücretsiz mi? Sonradan para istemeyecek misiniz?</summary><p>Evet, gerçekten. Padoboard bir hobi projesi ve ücretsiz kalacak. Kodu MIT lisansıyla açık: kimse bu sürümü senden geri alamaz, istersen kodu alıp kendin de derleyebilirsin. Üyelik, reklam ya da gizli ücret yok.</p></details>
+      <details><summary>Windows neden "bilinmeyen yayıncı" diyor?</summary><p>Uygulama henüz kod imzalı değil. İmzalı olmayan her yeni program bu uyarıyı alır. "Daha fazla bilgi", ardından "Yine de çalıştır" ile devam edebilirsin. Kodun tamamı açık, istersen kendin derleyebilirsin.</p></details>
+      <details><summary>Linux ve Mac var mı?</summary><p>Windows ve Linux için var. Linux sürümü (AppImage ve deb) yeni ve deneysel: PulseAudio ya da PipeWire üzerinde "Padoboard Mikrofon" adında bir sanal mikrofon oluşturur, sürücü ya da yönetici izni istemez. Wayland'da global kısayol tuşları çalışmayabilir. Mac için henüz bir sürüm yok.</p></details>
+      <details><summary>Verilerim nereye gidiyor?</summary><p>Hiçbir yere. Sesler ve ayarlar bilgisayarında kalır, telemetri yok. İstisnalar: çevrimiçi ses ararken arama kelimen Openverse'e, güncelleme kontrolünde GitHub'a bağlanılır.</p></details>
+      <details><summary>Bir sorun buldum, ne yapmalıyım?</summary><p>Ayarlar, Hakkında bölümündeki "Sorun bildir" butonuna bas. GitHub'da sürüm ve sistem bilgisi hazır dolu bir form açılır.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- İndir -->
+<section class="cta band-ink" id="indir">
+  <div class="wrap">
+    <div class="big">
+      <h2 class="disp">Hazırsan<br>bas.</h2>
+      <div class="dlbox" id="dlbox">
+        <a class="dl" id="dlWin" href="https://github.com/elifnurdemir/soundboard/releases/latest" target="_blank" rel="noopener">Windows için indir <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13"/><path d="m6 11 6 6 6-6"/><path d="M4 21h16"/></svg></a>
+        <div class="dl2">
+          <a class="dl alt" id="dlLinux" href="https://github.com/elifnurdemir/soundboard/releases/latest" target="_blank" rel="noopener">Linux · AppImage</a>
+          <a class="dl alt" id="dlDeb" href="https://github.com/elifnurdemir/soundboard/releases/latest" target="_blank" rel="noopener">Linux · deb</a>
+        </div>
+        <p class="ver mono" id="ver" aria-live="polite"></p>
+      </div>
+    </div>
+    <div class="notes">
+      <p>Windows 10 ve 11. Linux için AppImage ve deb (deneysel; PulseAudio ya da PipeWire gerekir). Mac için henüz sürüm yok. Ücretsiz, MIT lisanslı.</p>
+      <p>Uygulama henüz kod imzalı değil. Windows "bilinmeyen yayıncı" derse "Daha fazla bilgi", ardından "Yine de çalıştır" de.</p>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div class="col">
+        <h4 class="mono">Gizlilik</h4>
+        <ul>
+          <li>Sesler, ayarlar ve kayıtlar bilgisayarında kalır.</li>
+          <li>Telemetri, reklam ve takip kodu yok. Hatalar yalnızca yerel günlüğe yazılır.</li>
+          <li>İnternete yalnızca güncelleme kontrolü (GitHub) ve çevrimiçi ses araması (Openverse) için bağlanır.</li>
+        </ul>
+      </div>
+      <div class="col">
+        <h4 class="mono">Bağlantılar</h4>
+        <ul>
+          <li><a href="gizlilik.html">Gizlilik ayrıntıları</a></li>
+          <li><a href="https://github.com/elifnurdemir/soundboard" target="_blank" rel="noopener">GitHub deposu</a></li>
+          <li><a href="https://github.com/elifnurdemir/soundboard/issues" target="_blank" rel="noopener">Sorun bildir</a></li>
+          <li><a href="https://github.com/elifnurdemir/soundboard/releases" target="_blank" rel="noopener">Sürümler</a></li>
+        </ul>
+      </div>
+      <div class="col">
+        <h4 class="mono">Padoboard</h4>
+        <ul><li>MIT lisansı. Maskot: Pado.</li><li>Bir hobi projesi, ücretsiz kalacak.</li></ul>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<a class="btn pill" id="pill" href="#indir" data-os-label style="background:var(--ink);color:var(--lime)">Windows için indir</a>
+
+<template id="padoTpl">
+  <div class="pado" data-mood="idle" role="img" aria-label="Pado, Padoboard maskotu">
+    <svg viewBox="-20 -30 280 250" aria-hidden="true">
+      <path d="M56 78Q120-14 184 78" fill="none" stroke="#e9efe7" stroke-width="10" stroke-linecap="round"/>
+      <rect x="12" y="92" width="30" height="70" rx="15" fill="#e9efe7"/><rect x="18" y="104" width="18" height="46" rx="9" fill="#c4ff00"/>
+      <rect x="198" y="92" width="30" height="70" rx="15" fill="#e9efe7"/><rect x="204" y="104" width="18" height="46" rx="9" fill="#c4ff00"/>
+      <rect x="46" y="58" width="148" height="122" rx="40" fill="#111611" stroke="#c4ff00" stroke-width="11"/>
+      <g class="eyes">
+        <rect x="82" y="96" width="28" height="50" rx="14" fill="#c4ff00"/><rect x="130" y="96" width="28" height="50" rx="14" fill="#c4ff00"/>
+        <g class="pup"><rect x="89" y="108" width="14" height="26" rx="7" fill="#0a0d0a" opacity=".7"/><rect x="137" y="108" width="14" height="26" rx="7" fill="#0a0d0a" opacity=".7"/></g>
+      </g>
+      <g class="arcs" fill="none" stroke="#c4ff00" stroke-width="13" stroke-linecap="round"><path d="M82 140Q96 100 110 140"/><path d="M130 140Q144 100 158 140"/></g>
+      <g class="slp" fill="#c4ff00"><rect x="82" y="124" width="28" height="9" rx="4.5"/><rect x="130" y="124" width="28" height="9" rx="4.5"/></g>
+      <g class="brows" fill="#c4ff00"><rect x="78" y="80" width="38" height="9" rx="4.5"/><rect x="124" y="80" width="38" height="9" rx="4.5"/></g>
+      <g class="fx" style="opacity:1">
+        <text class="nt" x="206" y="40" fill="#c4ff00" font-size="30" font-family="serif">♪</text>
+        <text class="nt" x="20" y="34" fill="#ff5fa2" font-size="26" font-family="serif">♫</text>
+        <text class="nt" x="228" y="96" fill="#4aa3ff" font-size="22" font-family="serif">♪</text>
+        <g class="mag"><circle cx="176" cy="150" r="24" fill="rgba(196,255,0,.14)" stroke="#e9efe7" stroke-width="8"/><path d="M193 168L216 192" stroke="#e9efe7" stroke-width="10" stroke-linecap="round"/></g>
+        <g class="rec"><rect x="150" y="6" width="74" height="30" rx="6" fill="#111611" stroke="#ff5a3c" stroke-width="3"/><circle cx="168" cy="21" r="6" fill="#ff5a3c"/><text x="180" y="27" fill="#ff5a3c" font-size="16" font-family="monospace" font-weight="700">REC</text></g>
+        <g class="conf"><rect x="40" y="0" width="8" height="14" fill="#ff5a3c"/><rect x="86" y="-10" width="8" height="14" fill="#2de2a6"/><rect x="130" y="-4" width="8" height="14" fill="#4aa3ff"/><rect x="176" y="-14" width="8" height="14" fill="#ffb020"/><rect x="214" y="4" width="8" height="14" fill="#9b6bff"/><rect x="6" y="20" width="8" height="14" fill="#ff5fa2"/><rect x="108" y="-24" width="8" height="14" fill="#c4ff00"/></g>
+        <g class="zz" fill="#c4ff00" font-family="monospace" font-weight="700"><text x="196" y="50" font-size="26">z</text><text x="214" y="28" font-size="20">Z</text></g>
+      </g>
+    </svg>
+  </div>
+</template>
+
+<script>
+(function(){
+'use strict';
+var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var $ = function(s, r){ return (r||document).querySelector(s); };
+var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
+
+/* ---------- Ses motoru (Web Audio, sesler kodla üretilir) ---------- */
+var ctx = null, master = null, analyser = null, noiseBuf = null, soundOn = false;
+function ensure(){
+  if (ctx) return ctx;
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  ctx = new AC();
+  var comp = ctx.createDynamicsCompressor();
+  master = ctx.createGain(); master.gain.value = soundOn ? 0.7 : 0;
+  analyser = ctx.createAnalyser(); analyser.fftSize = 256;
+  master.connect(comp); comp.connect(analyser); analyser.connect(ctx.destination);
+  noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+  var d = noiseBuf.getChannelData(0);
+  for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return ctx;
+}
+function env(g, t, a, d, peak){
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+}
+function tone(type, f0, f1, t, dur, peak, dest){
+  var o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t);
+  if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  env(g, t, 0.006, dur, peak);
+  o.connect(g); g.connect(dest || master);
+  o.start(t); o.stop(t + dur + 0.06);
+}
+function noise(t, dur, peak, ftype, f0, f1, q, dest){
+  var s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+  s.buffer = noiseBuf; f.type = ftype; f.Q.value = q || 1;
+  f.frequency.setValueAtTime(f0, t);
+  if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  env(g, t, 0.008, dur, peak);
+  s.connect(f); f.connect(g); g.connect(dest || master);
+  s.start(t); s.stop(t + dur + 0.06);
+}
+var SND = {
+  zil: function(t, d){ tone('sine', 880, 0, t, 1.5, 0.34, d); tone('sine', 2217, 0, t, 0.9, 0.14, d); tone('sine', 1318, 0, t, 1.1, 0.12, d); },
+  davul: function(t, d){ tone('sine', 170, 42, t, 0.38, 0.95, d); noise(t, 0.05, 0.25, 'highpass', 1500, 0, 1, d); },
+  tik: function(t, d){ noise(t, 0.05, 0.5, 'highpass', 3500, 0, 1, d); tone('square', 1800, 900, t, 0.03, 0.12, d); },
+  patlama: function(t, d){ noise(t, 1.3, 0.95, 'lowpass', 3200, 90, 0.8, d); tone('sine', 90, 28, t, 0.8, 0.8, d); },
+  airhorn: function(t, d){
+    var g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 2400;
+    env(g, t, 0.02, 0.85, 0.34);
+    [466, 587, 698].forEach(function(f, i){
+      var o = ctx.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f * 0.92, t); o.frequency.linearRampToValueAtTime(f, t + 0.08);
+      o.detune.value = (i - 1) * 6; o.connect(lp); o.start(t); o.stop(t + 0.95);
+    });
+    lp.connect(g); g.connect(d || master);
+  },
+  lazer: function(t, d){ tone('sawtooth', 2000, 110, t, 0.4, 0.34, d); },
+  whoosh: function(t, d){ noise(t, 1.0, 0.7, 'bandpass', 250, 3200, 1.2, d); },
+  bip: function(t, d){ tone('square', 880, 0, t, 0.09, 0.2, d); tone('square', 1320, 0, t + 0.1, 0.13, 0.2, d); }
+};
+var sndBtn = $('#sndBtn'), sndTxt = $('#sndTxt');
+function setSound(on){
+  soundOn = on;
+  sndBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  sndTxt.textContent = on ? 'SES AÇIK' : 'SES KAPALI';
+  if (on) { ensure(); if (ctx && ctx.state === 'suspended') ctx.resume(); }
+  if (master) master.gain.setTargetAtTime(on ? 0.7 : 0, ctx.currentTime, 0.02);
+}
+sndBtn.addEventListener('click', function(){ setSound(!soundOn); });
+function wake(){
+  if (!soundOn) setSound(true);
+  else { ensure(); if (ctx && ctx.state === 'suspended') ctx.resume(); }
+  return ctx;
+}
+function playS(name){ if (!wake()) return; SND[name](ctx.currentTime + 0.005); }
+function beat(){}
+
+/* ---------- Pencereleri genişliğe göre ölçekle ---------- */
+function fitTo(box, inner, designW){
+  function f(){ inner.style.transform = 'scale(' + (box.clientWidth / designW) + ')'; }
+  f();
+  if ('ResizeObserver' in window) new ResizeObserver(f).observe(box); else window.addEventListener('resize', f);
+}
+fitTo($('#hshell'), $('#hinner'), 1000);
+fitTo($('#scr1'), $('#mi1'), 640);
+fitTo($('#scr2'), $('#mi2'), 640);
+
+/* ---------- Hero: canlı uygulama penceresi ---------- */
+var APADS = [
+  ['Airhorn','airhorn'],['Alkış','tik'],['Davul','davul'],['Kapı','tik'],['Yağmur','whoosh'],['Kahkaha','bip'],
+  ['Zil','zil'],['Patlama','patlama'],['Whoosh','whoosh'],['Bip','bip'],['Lazer','lazer'],['Tık','tik'],
+  ['Helal','bip'],['Vay be','zil'],['Bruh','davul'],['Sus','tik'],['Ding','zil'],['Pop','tik'],
+  ['Sirene','lazer'],['Vurgu','davul'],['Rüzgar','whoosh'],['Çan','zil'],['Gong','patlama'],['Klik','tik']
+];
+var COLORS = ['#ff5a3c','#ffb020','#4aa3ff','#2de2a6','#9b6bff','#ff5fa2','#1fd1d1','#c4ff00'];
+var PLAY_ICON = 'M8 5v14l11-7z', STOP_ICON = 'M6 6h12v12H6z';
+var apGrid = $('#apGrid'), appwin = $('#appwin'), sticker = $('#sticker'), playT = 0;
+APADS.forEach(function(p, i){
+  var b = document.createElement('button');
+  b.type = 'button'; b.className = 'ap'; b.style.setProperty('--c', COLORS[(i * 5 + Math.floor(i / 6)) % COLORS.length]);
+  b.setAttribute('aria-label', p[0] + ' sesini çal');
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + PLAY_ICON + '"/></svg><b></b>';
+  b.lastChild.textContent = p[0];
+  b.addEventListener('click', function(){
+    playS(p[1]);
+    $$('.ap.go').forEach(function(x){ x.classList.remove('go'); x.firstChild.firstChild.setAttribute('d', PLAY_ICON); });
+    b.classList.add('go'); b.firstChild.firstChild.setAttribute('d', STOP_ICON);
+    appwin.classList.add('on');
+    sticker.classList.remove('hit'); void sticker.getBoundingClientRect(); sticker.classList.add('hit');
+    clearTimeout(playT);
+    playT = setTimeout(function(){ b.classList.remove('go'); b.firstChild.firstChild.setAttribute('d', PLAY_ICON); appwin.classList.remove('on'); }, 1500);
+  });
+  apGrid.appendChild(b);
+});
+// kaydırma sırasında kendiliğinden çalan örnek: Airhorn padi ilk açılışta çalıyor görünsün
+(function(){ var a = apGrid.firstChild; a.classList.add('go'); a.firstChild.firstChild.setAttribute('d', STOP_ICON); appwin.classList.add('on'); setTimeout(function(){ if (!soundOn) { a.classList.remove('go'); a.firstChild.firstChild.setAttribute('d', PLAY_ICON); appwin.classList.remove('on'); } }, 2600); })();
+
+/* ---------- Bento etkileşimleri ---------- */
+var youRow = $('#youRow');
+$$('.mp, .orow button').forEach(function(b){
+  b.addEventListener('click', function(){
+    playS(b.getAttribute('data-s'));
+    b.classList.add('go'); setTimeout(function(){ b.classList.remove('go'); }, 400);
+    if (b.classList.contains('mp')) { youRow.classList.add('on'); clearTimeout(youRow._t); youRow._t = setTimeout(function(){ youRow.classList.remove('on'); }, 1200); }
+  });
+});
+// dalga formu
+(function(){
+  var w = $('#wave');
+  for (var i = 0; i < 64; i++) {
+    var b = document.createElement('i');
+    var h = 12 + Math.abs(Math.sin(i * 0.42) * 30 + Math.sin(i * 1.3) * 14);
+    b.style.height = h.toFixed(0) + 'px'; w.appendChild(b);
+  }
+})();
+// ses değiştirici
+var PRESETS = [
+  { n: 'Normal', r: 1 }, { n: 'Sincap', r: 1.8 }, { n: 'Kalın', r: 0.62 }, { n: 'Robot', r: 1, robot: true },
+  { n: 'Yankı', r: 1, echo: true }, { n: 'Canavar', r: 0.45, low: true }, { n: 'Uzaylı', r: 1.25, vib: true }
+];
+var curPreset = 0, chips = $('#chips');
+PRESETS.forEach(function(p, i){
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = p.n;
+  b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+  b.addEventListener('click', function(){
+    curPreset = i; $$('.chip', chips).forEach(function(x, j){ x.setAttribute('aria-pressed', j === i ? 'true' : 'false'); });
+    playVoice();
+  });
+  chips.appendChild(b);
+});
+function playVoice(){
+  if (!wake()) return;
+  var P = PRESETS[curPreset], t = ctx.currentTime + 0.05, notes = [220, 261.63, 329.63, 261.63, 196], dur = 0.3;
+  var bus2 = ctx.createGain(); bus2.gain.value = 0.9;
+  var node = bus2, end = t + notes.length * dur + 0.4;
+  if (P.robot) {
+    var rm = ctx.createGain(); rm.gain.value = 0;
+    var lfo = ctx.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 58;
+    lfo.connect(rm.gain); lfo.start(t); lfo.stop(end);
+    node.connect(rm); node = rm;
+  }
+  if (P.echo) {
+    var dl = ctx.createDelay(1), fb = ctx.createGain(); dl.delayTime.value = 0.24; fb.gain.value = 0.45;
+    node.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(master);
+  }
+  node.connect(master);
+  notes.forEach(function(f, i){
+    var ts = t + i * dur, o = ctx.createOscillator(), g = ctx.createGain();
+    var f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter(), mix = ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(f * P.r, ts);
+    if (P.vib) {
+      var vl = ctx.createOscillator(), vg = ctx.createGain(); vl.frequency.value = 8; vg.gain.value = f * P.r * 0.05;
+      vl.connect(vg); vg.connect(o.frequency); vl.start(ts); vl.stop(ts + dur + 0.1);
+    }
+    f1.type = 'bandpass'; f1.frequency.value = P.low ? 420 : 800; f1.Q.value = 5;
+    f2.type = 'bandpass'; f2.frequency.value = P.low ? 800 : 1500; f2.Q.value = 6;
+    o.connect(f1); o.connect(f2); f1.connect(mix); f2.connect(mix); mix.gain.value = 1.2;
+    env(g, ts, 0.03, dur * 0.85, 0.5);
+    mix.connect(g); g.connect(bus2);
+    o.start(ts); o.stop(ts + dur + 0.1);
+  });
+}
+
+/* ---------- Kayan şerit eğilmesi ---------- */
+var tilt = $('#tilt'), lastY = scrollY, skew = 0;
+if (!reduce) (function loop(){
+  var y = scrollY, v = y - lastY; lastY = y;
+  skew += (Math.max(-9, Math.min(9, v * 0.55)) - skew) * 0.14;
+  tilt.style.setProperty('--skew', skew.toFixed(2) + 'deg');
+  requestAnimationFrame(loop);
+})();
+
+/* ---------- Fiş: ekrana girince basılır ---------- */
+(function(){
+  var r = document.getElementById('receipt');
+  if (reduce || !('IntersectionObserver' in window)) return;
+  var io = new IntersectionObserver(function(es){ if (es[0].isIntersecting) { r.classList.add('print'); io.disconnect(); } }, { threshold: 0.35 });
+  io.observe(r);
+})();
+
+/* ---------- İndirme: işletim sistemine göre etiket, son sürümden doğrudan bağlantı ---------- */
+(function(){
+  var ua = (navigator.userAgent || '').toLowerCase(), plat = (navigator.platform || '').toLowerCase();
+  var os = /android|iphone|ipad/.test(ua) ? 'mobile' : /linux|x11/.test(ua + ' ' + plat) ? 'linux' : /mac/.test(ua + ' ' + plat) ? 'mac' : 'win';
+  var label = os === 'linux' ? 'Linux için indir' : os === 'win' ? 'Windows için indir' : 'İndirme seçenekleri';
+  $$('[data-os-label]').forEach(function(a){ a.textContent = a.classList.contains('pill') ? label : label.toUpperCase(); });
+  if (os === 'linux') { var box = $('#dlbox'); $('#dlWin').style.order = 2; $('.dl2').style.order = 1; }
+  var REPO = 'elifnurdemir/soundboard', page = 'https://github.com/' + REPO + '/releases/latest';
+  if (!window.fetch) return;
+  fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+    .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(rel){
+      var by = function(re){ var a = (rel.assets || []).filter(function(x){ return re.test(x.name); })[0]; return a ? a.browser_download_url : null; };
+      var win = by(/\.exe$/i), img = by(/\.AppImage$/i), deb = by(/\.deb$/i);
+      if (win) $('#dlWin').href = win;
+      if (img) $('#dlLinux').href = img;
+      if (deb) $('#dlDeb').href = deb;
+      if (rel.tag_name) $('#ver').textContent = 'Son sürüm ' + rel.tag_name;
+    })
+    .catch(function(){ /* sürüm bilgisi alınamazsa düğmeler sürümler sayfasına gider */ });
+})();
+
+/* ---------- Yüzen indirme düğmesi ---------- */
+var pill = $('#pill');
+function onScroll(){
+  var y = scrollY, ind = $('#indir').getBoundingClientRect();
+  pill.classList.toggle('vis', y > 700 && ind.top > innerHeight * 0.6);
+}
+window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+/* ---------- İki monitör ---------- */
+
+
+var listen = { 1: false, 2: false };
+$$('.listen').forEach(function(b){
+  b.addEventListener('click', function(){
+    var k = b.getAttribute('data-mon'); listen[k] = !listen[k];
+    b.setAttribute('aria-pressed', listen[k] ? 'true' : 'false');
+    b.textContent = listen[k] ? 'Ses açık' : 'Sesini dinle';
+    if (listen[k]) wake();
+  });
+});
+function inWin(T, a, b){ return T >= a && T < b; }
+function cl(x, a, b){ return Math.max(a, Math.min(b, x)); }
+function ease(u){ u = cl(u, 0, 1); return u * u * (3 - 2 * u); }
+function lerp(a, b, u){ return a + (b - a) * u; }
+
+/* Monitör 1: oyun + sesli sohbet, 9 sn döngü */
+var M1 = { P: 9, prev: -1, sound: {} };
+var gObs = $('#gObs'), gPlayer = $('#gPlayer'), gBoom = $('#gBoom'), gGround = $('#gGround');
+var say = $('#say'), toast1 = $('#toast1'), mi1 = $('#mi1');
+var vr = { can: $('#vrCan'), ece: $('#vrEce'), you: $('#vrYou') };
+var SAYS = [
+  [0.5, 2.8, 'Can', 'Önünde engel var, dikkat!'],
+  [3.5, 5.0, 'Ece', 'HAHAHAHA'],
+  [6.0, 7.2, 'Can', 'Atlayacak mı bu?'],
+  [7.5, 8.8, 'Ece', 'Helal be!']
+];
+function mon1(T){
+  if (T < M1.prev) M1.sound = {};
+  M1.prev = T;
+  gGround.style.backgroundPosition = (-T * 260) + 'px 0';
+  var shake = inWin(T, 3.25, 3.6) ? (Math.sin(T * 90) * 4) : 0;
+  mi1.style.marginLeft = shake + 'px';
+  /* engel 1: çarpar */
+  var x1 = 130 + (3.2 - T) * 260;
+  gObs.style.display = 'block';
+  var ox = x1;
+  if (T >= 3.2 && T < 4.6) ox = -80;
+  /* engel 2: atlar */
+  if (T >= 4.9) ox = 130 + (6.75 - T) * 260;
+  if (T < 0.4) ox = 800;
+  gObs.style.left = ox + 'px';
+  var jump = inWin(T, 6.4, 7.1) ? -78 * Math.sin(Math.PI * (T - 6.4) / 0.7) : 0;
+  gPlayer.style.top = (260 + jump) + 'px';
+  gPlayer.style.background = inWin(T, 3.2, 3.7) ? 'var(--coral)' : 'var(--lime)';
+  gBoom.style.opacity = inWin(T, 3.2, 3.9) ? 1 : 0;
+  /* konuşmalar */
+  var s = null;
+  SAYS.forEach(function(r){ if (inWin(T, r[0], r[1])) s = r; });
+  say.classList.toggle('on', !!s);
+  if (s) say.innerHTML = '<b>' + s[2] + '</b> ' + s[3];
+  vr.can.classList.toggle('on', inWin(T, 0.5, 2.8) || inWin(T, 6.0, 7.2));
+  vr.ece.classList.toggle('on', inWin(T, 3.5, 5.0) || inWin(T, 7.5, 8.8));
+  var air = inWin(T, 3.3, 4.9), zil = inWin(T, 7.2, 8.4);
+  vr.you.classList.toggle('on', air || zil);
+  $('#pbAir').classList.toggle('on', air);
+  $('#pbZil').classList.toggle('on', zil);
+  toast1.classList.toggle('on', air || zil);
+  toast1.textContent = air ? 'AIRHORN → kanala gönderildi' : zil ? 'ZİL → kanala gönderildi' : '';
+  if (air && !M1.sound.a) { M1.sound.a = 1; if (listen[1] && soundOn && ctx) SND.airhorn(ctx.currentTime + 0.02); }
+  if (zil && !M1.sound.z) { M1.sound.z = 1; if (listen[1] && soundOn && ctx) SND.zil(ctx.currentTime + 0.02); }
+}
+
+/* Monitör 2: Stüdyo, 13 sn döngü */
+var M2 = { P: 13, prev: -1, sound: {} };
+var clipRec = $('#clipRec'), clipAir = $('#clipAir'), wvRec = $('#wvRec'), stHead = $('#stHead'), stCur = $('#stCur');
+var stRec = $('#stRec'), stPlay2 = $('#stPlay2'), stMerge = $('#stMerge'), stProg = $('#stProg'), stMsg = $('#stMsg'), stDone = $('#stDone'), stConf = $('#stConf');
+var wvBars = [];
+(function(){
+  for (var i = 0; i < 70; i++) {
+    var b = document.createElement('i');
+    var h = 4 + Math.abs(Math.sin(i * 1.7) * 14 + Math.sin(i * 0.53) * 8);
+    b.style.height = h.toFixed(0) + 'px'; wvRec.appendChild(b); wvBars.push(b);
+  }
+  var cols = ['#ff5a3c', '#2de2a6', '#4aa3ff', '#ffb020', '#9b6bff', '#ff5fa2', '#c4ff00'];
+  for (var j = 0; j < 36; j++) {
+    var c = document.createElement('i');
+    c.style.left = (Math.random() * 100) + '%'; c.style.background = cols[j % cols.length];
+    c.style.animationDelay = (Math.random() * 0.5).toFixed(2) + 's'; stConf.appendChild(c);
+  }
+})();
+var CUR = [
+  [0, 340, 90], [0.5, 350, 26], [3.0, 350, 26], [3.5, 70, 82], [3.7, 70, 82], [5.4, 218, 166], [5.6, 455, 20],
+  [8.8, 566, 20], [10.6, 566, 20], [11.6, 560, 150], [13, 560, 150]
+];
+function curAt(T){
+  for (var i = 0; i < CUR.length - 1; i++) {
+    if (T >= CUR[i][0] && T < CUR[i + 1][0]) {
+      var u = ease((T - CUR[i][0]) / (CUR[i + 1][0] - CUR[i][0]));
+      return [lerp(CUR[i][1], CUR[i + 1][1], u), lerp(CUR[i][2], CUR[i + 1][2], u)];
+    }
+  }
+  return [CUR[CUR.length - 1][1], CUR[CUR.length - 1][2]];
+}
+var STHITS = [
+  [5.68, 'airhorn', '#clipAir'], [5.81, 'davul', '#cD1'], [6.33, 'davul', '#cD2'], [6.85, 'davul', '#cD3'], [7.36, 'zil', null]
+];
+function fire(sel){ if (!sel) return; var e = $(sel); e.classList.add('fire'); setTimeout(function(){ e.classList.remove('fire'); }, 180); }
+function mon2(T){
+  if (T < M2.prev) { M2.sound = {}; stConf.classList.remove('go'); }
+  var prev = M2.prev; M2.prev = T;
+  var c = curAt(T); stCur.style.transform = 'translate(' + c[0].toFixed(1) + 'px,' + c[1].toFixed(1) + 'px)';
+  /* 0-3.2: kayıt */
+  var rec = inWin(T, 0.5, 3.2);
+  stRec.classList.toggle('on', rec);
+  var grow = ease((T - 0.5) / 2.7);
+  clipRec.style.width = (T < 0.5 ? 0 : 250 * grow) + 'px';
+  wvBars.forEach(function(b, i){ b.style.opacity = (i / wvBars.length) <= grow ? 1 : 0; });
+  /* 3.5-5.4: sürükle */
+  var du = ease((T - 3.7) / 1.7);
+  if (T >= 3.5) {
+    clipAir.style.opacity = 1;
+    clipAir.style.left = (T < 3.7 ? 12 : lerp(12, 170, du)) + 'px';
+    clipAir.style.top = (T < 3.7 ? 66 : lerp(66, 142, du)) + 'px';
+  } else clipAir.style.opacity = 0;
+  /* 5.6-8.6: oynat */
+  var play = inWin(T, 5.6, 8.6);
+  stPlay2.classList.toggle('act', play);
+  stHead.style.opacity = play ? 1 : 0;
+  stHead.style.left = (158 + 462 * cl((T - 5.6) / 3, 0, 1)) + 'px';
+  if (play) STHITS.forEach(function(h, i){
+    if (prev < h[0] && T >= h[0] && !M2.sound[i]) {
+      M2.sound[i] = 1; fire(h[2]);
+      if (listen[2] && soundOn && ctx) SND[h[1]](ctx.currentTime + 0.02);
+    }
+  });
+  /* 8.8-10.8: birleştir */
+  var merge = inWin(T, 8.8, 10.8);
+  stMerge.classList.toggle('on', merge || T >= 10.8);
+  var pu = cl((T - 9.0) / 1.6, 0, 1);
+  stProg.style.width = (T >= 9.0 ? pu * 100 : 0) + '%';
+  stMsg.textContent = rec ? 'Kayıt alınıyor…' : T < 3.5 ? 'Hazır' : T < 5.6 ? 'Parça ekleniyor' : play ? 'Çalıyor' : merge ? 'Birleştiriliyor ' + Math.round(pu * 100) + '%' : T >= 10.8 ? 'Dışa aktarıldı' : 'Hazır';
+  var done = T >= 10.8;
+  stDone.classList.toggle('on', done);
+  if (done && !stConf.classList.contains('go')) { stConf.classList.add('go'); }
+}
+
+/* iki monitörü tek döngüde, görünürken sür */
+var vis = { 1: false, 2: false };
+if ('IntersectionObserver' in window) {
+  var mio = new IntersectionObserver(function(es){
+    es.forEach(function(e){ vis[e.target.id === 'mon1' ? 1 : 2] = e.isIntersecting; });
+  }, { threshold: 0.15 });
+  mio.observe($('#mon1')); mio.observe($('#mon2'));
+} else { vis[1] = vis[2] = true; }
+var mt0 = performance.now();
+(function loopMon(now){
+  requestAnimationFrame(loopMon);
+  var s = (now - mt0) / 1000;
+  if (vis[1]) mon1(s % M1.P);
+  if (vis[2]) mon2(s % M2.P);
+})(performance.now());
+
+
+
+/* ---------- Pado ---------- */
+var tpl = $('#padoTpl'), padoEl = tpl.content.firstElementChild.cloneNode(true);
+$('#padoSlot').appendChild(padoEl);
+var MOODS = [
+  ['idle', 'Bekliyor', 'Butonlar hazır. Bir tuşa basana kadar Pado göz kırpıp seni izler.'],
+  ['play', 'Çalıyor', 'Ses hem kulaklığına hem arkadaşlarının duyduğu mikrofona gider.'],
+  ['search', 'Arıyor', 'Çevrimiçi kütüphanede arar. Önce dinlersin, beğendiğini eklersin.'],
+  ['rec', 'Kayıtta', 'Stüdyoda kayıt alırken kaşını çatıp bekler.'],
+  ['party', 'Kutluyor', 'Parçaları birleştirip MP3 yaptın mı, konfeti Pado\'dan.'],
+  ['sleep', 'Uyuyor', 'Beş dakika dokunmazsan uyur. Dokununca uyanır.']
+];
+var moodsEl = $('#moods'), moodLine = $('#moodLine'), moodI = 0, moodAuto = true;
+function setMood(i){
+  moodI = i; padoEl.setAttribute('data-mood', MOODS[i][0]);
+  $$('button', moodsEl).forEach(function(b, j){ b.setAttribute('aria-pressed', j === i ? 'true' : 'false'); });
+  moodLine.textContent = MOODS[i][2];
+  padoEl.classList.remove('hit'); void padoEl.getBoundingClientRect(); padoEl.classList.add('hit');
+}
+MOODS.forEach(function(m, i){
+  var b = document.createElement('button'); b.type = 'button'; b.textContent = m[1];
+  b.addEventListener('click', function(){ moodAuto = false; setMood(i); });
+  moodsEl.appendChild(b);
+});
+padoEl.addEventListener('click', function(){ moodAuto = false; setMood((moodI + 1) % MOODS.length); });
+setMood(0);
+if (!reduce) setInterval(function(){ if (moodAuto) setMood((moodI + 1) % MOODS.length); }, 3600);
+window.addEventListener('pointermove', function(e){
+  if (reduce) return;
+  var r = padoEl.getBoundingClientRect();
+  if (r.bottom < 0 || r.top > innerHeight) return;
+  var dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  var d = Math.max(1, Math.hypot(dx, dy)), k = Math.min(1, d / 280);
+  padoEl.style.setProperty('--px', (dx / d * k * 7).toFixed(2));
+  padoEl.style.setProperty('--py', (dy / d * k * 9).toFixed(2));
+}, { passive: true });
+})();
+</script>
+
+</body>
+</html>
