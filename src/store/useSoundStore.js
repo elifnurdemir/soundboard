@@ -119,6 +119,9 @@ const useSoundStore = create((set, get) => ({
       console.error('Load error:', err);
     } finally {
       set({ isLoaded: true });
+      // Sesleri önceden hazırla: ilk basışta decode beklenmesin (en çok çalınan önce)
+      audioEngine.warm([...get().sounds].filter((s) => s.filePath).sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 300)
+        .map((s) => ({ url: buildAudioUrl(s.filePath), trimStart: s.trimStart ?? 0, trimEnd: s.trimEnd ?? null }))).catch(() => {});
       // Restore virtual device on router
       const { settings } = get();
       if (settings.voiceDeviceId) {
@@ -172,6 +175,7 @@ const useSoundStore = create((set, get) => ({
       createdAt: Date.now(),
     };
     set((state) => ({ sounds: [...state.sounds, s] }));
+    if (s.filePath) audioEngine.preload(buildAudioUrl(s.filePath), s.trimStart, s.trimEnd);
     get().saveData();
     return s;
   },
@@ -180,6 +184,8 @@ const useSoundStore = create((set, get) => ({
     set((state) => ({
       sounds: state.sounds.map((s) => (s.id === id ? { ...s, ...updates } : s)),
     }));
+    const u = get().sounds.find((s) => s.id === id);
+    if (u?.filePath) audioEngine.preload(buildAudioUrl(u.filePath), u.trimStart ?? 0, u.trimEnd ?? null);
     get().saveData();
   },
 

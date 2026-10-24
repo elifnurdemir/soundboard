@@ -9,7 +9,9 @@
  *                                     └→ reverb send → convolver → out   └→ cable
  */
 
-const MAX_CACHED_BUFFERS = 24;
+// Çözülmüş (decode edilmiş) sesler bellekte tutulur; en az kullanılan, bu bayt sınırı aşılınca atılır.
+// 1 dakikalık stereo ses yaklaşık 21 MB eder; kırpılmış sesler yalnızca kırpılan kısım kadar yer tutar.
+const CACHE_BYTES = 256 * 1024 * 1024;
 
 class Voice {
   constructor(engine, nodes, meta) {
@@ -74,7 +76,10 @@ class AudioEngine {
     this.cableEl = null;
     this.cableDeviceId = null;
     this.reverbIn = null;
-    this._buffers = new Map(); // url → Promise<AudioBuffer>
+    this._buffers = new Map(); // anahtar (url|başlangıç|bitiş) → Promise<AudioBuffer>, en eski başta
+    this._sizes = new Map(); // anahtar → bayt
+    this._inflight = new Map(); // url → Promise<AudioBuffer> (aynı dosya iki kez çözülmesin)
+    this._warming = false;
   }
 
   _ensure() {
@@ -136,28 +141,82 @@ class AudioEngine {
     }
   }
 
-  _decode(url) {
-    let p = this._buffers.get(url);
-    if (p) {
-      // refresh LRU position
-      this._buffers.delete(url);
-      this._buffers.set(url, p);
-      return p;
-    }
+  // Dosyayı okuyup tamamını çözer (uzun videolar birkaç yüz ms sürebilir); aynı anda gelen istekler tek işi paylaşır
+  _decodeFull(url) {
+    let p = this._inflight.get(url);
+    if (p) return p;
     const ctx = this._ensure();
     p = fetch(url)
       .then((r) => r.arrayBuffer())
       .then((ab) => ctx.decodeAudioData(ab));
-    p.catch(() => this._buffers.delete(url));
-    this._buffers.set(url, p);
-    while (this._buffers.size > MAX_CACHED_BUFFERS) {
-      this._buffers.delete(this._buffers.keys().next().value);
-    }
+    const done = () => this._inflight.delete(url);
+    p.then(done, done);
+    this._inflight.set(url, p);
     return p;
   }
 
-  preload(url) {
-    return this._decode(url).catch(() => {});
+  // Kırpılmışsa yalnızca kırpılan kısmı kopyalar (büyük dosyanın tamamı bellekte kalmaz)
+  _slice(buffer, trimStart, trimEnd) {
+    const rate = buffer.sampleRate;
+    const from = Math.min(buffer.length - 1, Math.max(0, Math.floor((trimStart || 0) * rate)));
+    const to = Math.min(buffer.length, trimEnd != null ? Math.max(from + 1, Math.floor(trimEnd * rate)) : buffer.length);
+    if (from === 0 && to === buffer.length) return buffer;
+    const cut = this.ctx.createBuffer(buffer.numberOfChannels, to - from, rate);
+    for (let c = 0; c < buffer.numberOfChannels; c++) cut.copyToChannel(buffer.getChannelData(c).subarray(from, to), c);
+    return cut;
+  }
+
+  _evict() {
+    let total = 0;
+    this._sizes.forEach((b) => { total += b; });
+    for (const key of this._buffers.keys()) {
+      if (total <= CACHE_BYTES || this._buffers.size <= 1) break;
+      total -= this._sizes.get(key) || 0;
+      this._buffers.delete(key);
+      this._sizes.delete(key);
+    }
+  }
+
+  // Çalmaya hazır (kırpılmış) buffer; bir kez hazırlanınca bellekten anında gelir
+  _prepare(url, trimStart = 0, trimEnd = null) {
+    const trimmed = trimStart > 0 || trimEnd != null;
+    const key = url + '|' + (trimmed ? trimStart : 0) + '|' + (trimmed && trimEnd != null ? trimEnd : '');
+    let p = this._buffers.get(key);
+    if (p) {
+      this._buffers.delete(key); // en son kullanılana taşı
+      this._buffers.set(key, p);
+      return p;
+    }
+    p = this._decodeFull(url).then((full) => {
+      const buf = trimmed ? this._slice(full, trimStart, trimEnd) : full;
+      this._sizes.set(key, buf.length * buf.numberOfChannels * 4);
+      this._evict();
+      return buf;
+    });
+    p.catch(() => { this._buffers.delete(key); this._sizes.delete(key); });
+    this._buffers.set(key, p);
+    return p;
+  }
+
+  preload(url, trimStart = 0, trimEnd = null) {
+    return this._prepare(url, trimStart, trimEnd).catch(() => {});
+  }
+
+  /**
+   * Tüm sesleri sırayla önceden hazırlar (açılışta). Böylece ilk basışta decode beklenmez.
+   * items: [{ url, trimStart, trimEnd }], en çok kullanılan önce.
+   */
+  async warm(items) {
+    if (this._warming) return;
+    this._warming = true;
+    try {
+      for (const it of items) {
+        await this.preload(it.url, it.trimStart, it.trimEnd);
+        await new Promise((r) => setTimeout(r, 40)); // arayüz takılmasın
+      }
+    } finally {
+      this._warming = false;
+    }
   }
 
   /**
@@ -168,15 +227,15 @@ class AudioEngine {
     const ctx = this._ensure();
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
-    const buffer = await this._decode(url);
     const {
       volume = 1, loop = false, rate = 1, trimStart = 0, trimEnd = null,
       fadeIn = 0, fadeOut = 0, bass = 0, treble = 0, reverb = 0, onEnded,
     } = opts;
-
-    const hasTrim = trimStart > 0 || trimEnd != null;
-    const start = Math.min(Math.max(0, trimStart), Math.max(0, buffer.duration - 0.01));
-    const end = Math.min(buffer.duration, trimEnd != null ? trimEnd : buffer.duration);
+    // Kırpma buffer'ın kendisine uygulanır (hazırlanırken kesilir): çalma baştan sona, döngü de kırpılan kısımda döner
+    const buffer = await this._prepare(url, trimStart, trimEnd);
+    const hasTrim = false;
+    const start = 0;
+    const end = buffer.duration;
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
