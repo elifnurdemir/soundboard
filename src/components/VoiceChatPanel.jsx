@@ -5,6 +5,7 @@ import { VoiceChatRouter } from '../audio/VoiceChatRouter';
 import ProGate from './ProGate';
 import useRoomStore from '../store/useRoomStore';
 import { VOICE_PRESETS } from '../audio/VoiceChanger';
+import useSetupStore from '../store/useSetupStore';
 
 export default function VoiceChatPanel() {
   const { closeVoiceChat } = useSoundStore();
@@ -142,6 +143,7 @@ export default function VoiceChatPanel() {
           <div className="bracket-4 p-4 bg-app-surface space-y-3">
             <div className="flex items-center gap-2">
               <span className="tag-accent text-[9px]">KURULUM</span>
+              <button type="button" onClick={() => { closeVoiceChat(); useSetupStore.getState().show(); }} className="ml-auto text-[10px] font-mono text-[#8e9c8b] hover:text-white underline">Adım adım rehber</button>
             </div>
             <ol className="text-xs font-mono space-y-2" style={{ color: '#8e9c8b' }}>
               <li className="flex gap-2">

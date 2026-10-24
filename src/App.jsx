@@ -4,7 +4,9 @@ import useStreamStore from './store/useStreamStore';
 import useLicenseStore from './store/useLicenseStore';
 import useRoomStore from './store/useRoomStore';
 import useCollageStore from './store/useCollageStore';
+import useSetupStore from './store/useSetupStore';
 import CollageStudio from './components/CollageStudio';
+import SetupWizard from './components/SetupWizard';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import SoundGrid from './components/SoundGrid';
@@ -40,10 +42,16 @@ export default function App() {
   const { onChatCommand } = useStreamStore();
   const isCollageOpen = useCollageStore((s) => s.isOpen);
   const licenseStatus = useLicenseStore((s) => s.status);
+  const isSetupOpen = useSetupStore((s) => s.open);
   const unsubRef = useRef(null);
 
   useEffect(() => { loadData(); }, []);
   useEffect(() => { useLicenseStore.getState().checkStatus(); }, []);
+
+  // İlk açılışta kurulum rehberi. Daha önce sanal kablo ayarlamış kullanıcılara gösterilmez.
+  useEffect(() => {
+    if (isLoaded && window.electronAPI && !settings.setupDone && !settings.voiceDeviceId) useSetupStore.getState().show();
+  }, [isLoaded]);
 
   // Ortak oda: arkadaşların istekleri (oda main process'te çalışıyor)
   useEffect(() => {
@@ -155,6 +163,7 @@ export default function App() {
       {isVoiceChatOpen && <VoiceChatPanel />}
       {isStreamOpen && <StreamPanel />}
       {isCollageOpen && <CollageStudio />}
+      {isSetupOpen && <SetupWizard />}
       <UpdateBanner />
       <SoundQueue />
     </div>
