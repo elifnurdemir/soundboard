@@ -549,6 +549,26 @@ function getYtDlpPath() {
     : path.join(__dirname, 'bin', YTDLP_FILE);
 }
 
+// Videonun küçük resmini images klasörüne indirir; bulunamazsa null (ses yine de eklenir)
+async function downloadYoutubeThumbnail(url) {
+  try {
+    const id = url.match(/(?:v=|shorts\/|youtu\.be\/)([\w-]{11})/)?.[1];
+    if (!id) return null;
+    const folder = path.join(app.getPath('userData'), 'images');
+    fs.mkdirSync(folder, { recursive: true });
+    for (const name of ['maxresdefault', 'hqdefault']) {
+      const res = await fetch(`https://i.ytimg.com/vi/${id}/${name}.jpg`);
+      if (!res.ok) continue;
+      const dest = path.join(folder, `yt-${id}.jpg`);
+      fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+      return dest;
+    }
+  } catch (err) {
+    console.warn('YouTube thumbnail failed:', err.message);
+  }
+  return null;
+}
+
 ipcMain.handle('download-youtube-audio', async (_, url) => {
   const proError = requireProOrError();
   if (proError) return proError;
@@ -609,7 +629,8 @@ ipcMain.handle('download-youtube-audio', async (_, url) => {
 
     const destPath = moveIntoSoundsFolder(tmpFilePath);
     const title = path.basename(destPath, path.extname(destPath));
-    return { success: true, destPath, title, clip };
+    const thumbnail = await downloadYoutubeThumbnail(url);
+    return { success: true, destPath, title, clip, thumbnail };
   } catch (err) {
     console.error('YouTube download error:', err);
     return { success: false, error: err.message || 'İndirme başarısız oldu' };

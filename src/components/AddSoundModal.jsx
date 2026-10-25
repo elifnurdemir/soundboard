@@ -185,6 +185,7 @@ export default function AddSoundModal() {
         setTrimStart(res.clip?.start ?? 0);
         setTrimEnd(res.clip?.end ?? null);
         setOwnedFile(!!res.clip);
+        if (res.thumbnail && !imagePath) { setImagePath(res.thumbnail); setNoColor(true); }
         setYoutubeUrl('');
       } else {
         setDownloadError(res.error || 'İndirme başarısız oldu');
