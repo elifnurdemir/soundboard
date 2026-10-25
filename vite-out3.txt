@@ -1,0 +1,40 @@
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m211[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m14:07:15[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css, /src/components/Header.jsx, /src/components/SoundGrid.jsx, /src/components/AddSoundModal.jsx, /src/components/SettingsPanel.jsx, /src/components/Sidebar.jsx, /src/components/SoundButton.jsx[22m
+[2m14:07:34[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css[22m
+[2m14:08:15[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/components/Header.jsx.tmp.4476.ba58668a90c4[22m
+[2m14:08:15[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Header.jsx, /src/index.css[22m
+[2m14:09:01[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/SoundButton.jsx, /src/index.css[22m
+[2m14:09:02[22m [36m[1m[vite][22m[39m [32m✨ new dependencies optimized: [33m@dnd-kit/sortable, @dnd-kit/utilities[32m[39m
+[2m14:09:02[22m [36m[1m[vite][22m[39m [32m✨ optimized dependencies changed. reloading[39m
+[2m14:09:28[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/SoundGrid.jsx, /src/index.css[22m
+[2m14:09:28[22m [36m[1m[vite][22m[39m [32m✨ new dependencies optimized: [33m@dnd-kit/core[32m[39m
+[2m14:09:28[22m [36m[1m[vite][22m[39m [32m✨ optimized dependencies changed. reloading[39m
+[2m14:11:11[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/components/VoiceChatPanel.jsx.tmp.4476.1d10a4745ceb[22m
+[2m14:11:50[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/components/StreamPanel.jsx.tmp.4476.7c124054ccda[22m
+[2m14:13:22[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/AddSoundModal.jsx, /src/index.css[22m
+[2m14:13:56[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/SettingsPanel.jsx, /src/index.css[22m
+[2m14:14:42[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/components/VoiceChatPanel.jsx[22m
+[2m14:21:01[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/components/Header.jsx, /src/App.jsx, /src/components/StreamPanel.jsx[22m
+[2m14:21:04[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/VoiceChatPanel.jsx, /src/index.css[22m
+[2m14:21:15[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/VoiceChatPanel.jsx, /src/index.css[22m
+[2m14:26:41[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mtailwind.config.js[22m
+[2m14:27:18[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m14:27:28[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css[22m
+[2m14:28:10[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Header.jsx, /src/index.css[22m
+[2m14:28:44[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.jsx, /src/index.css[22m
+[2m14:29:09[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/SoundGrid.jsx, /src/index.css[22m
+[2m14:29:47[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/SettingsPanel.jsx, /src/index.css[22m
+[2m14:30:25[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/VoiceChatPanel.jsx, /src/index.css[22m
+[2m14:31:08[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/StreamPanel.jsx, /src/index.css[22m
+[2m14:32:21[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/AddSoundModal.jsx, /src/index.css[22m
+[2m14:39:24[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m14:39:24[22m [36m[1m[vite][22m[39m server restarted.
+[2m14:41:46[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/SoundButton.jsx, /src/index.css[22m
+[2m14:42:08[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
+[2m14:42:15[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m14:42:21[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mtailwind.config.js[22m
+[2m14:42:26[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
