@@ -164,7 +164,7 @@ export default function AddSoundModal() {
   const recordStreamRef = useRef(null);
   const recordTimerRef = useRef(null);
 
-  const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)/i;
+  const YOUTUBE_URL_RE = /^https?:\/\/(www\.|m\.)?(youtube\.com\/(watch\?v=|shorts\/|clip\/)|youtu\.be\/)/i;
 
   const handleYoutubeDownload = async () => {
     if (!YOUTUBE_URL_RE.test(youtubeUrl.trim())) {
@@ -181,8 +181,10 @@ export default function AddSoundModal() {
         setFilePath(res.destPath);
         setFileName(res.destPath.split(/[\\/]/).pop());
         if (!name) setName(res.title);
-        setTrimStart(0);
-        setTrimEnd(null);
+        // Clip linki: clip aralığı kırpma olarak gelir, kaydederken dosyaya işlenir
+        setTrimStart(res.clip?.start ?? 0);
+        setTrimEnd(res.clip?.end ?? null);
+        setOwnedFile(!!res.clip);
         setYoutubeUrl('');
       } else {
         setDownloadError(res.error || 'İndirme başarısız oldu');
@@ -525,7 +527,7 @@ export default function AddSoundModal() {
                             type="text"
                             value={youtubeUrl}
                             onChange={(e) => { setYoutubeUrl(e.target.value); setDownloadError(''); }}
-                            placeholder="YouTube linki yapıştır..."
+                            placeholder="YouTube veya clip linki yapıştır..."
                             disabled={downloading}
                             className="flex-1 min-w-0 bg-app-input border border-app-border px-3 py-2 text-sm text-white outline-none focus-lime font-mono placeholder-[#3c4238] disabled:opacity-50"
                           />

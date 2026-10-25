@@ -88,7 +88,7 @@ class AudioEngine {
     this.ctx = null;
     this.out = null;
     this.cableDest = null;
-    this.cableEl = null;
+    this.cableCtx = null;
     this.cableDeviceId = null;
     this.reverbIn = null;
     this._buffers = new Map(); // anahtar (url|başlangıç|bitiş) → Promise<AudioBuffer>, en eski başta
@@ -102,19 +102,13 @@ class AudioEngine {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     this.ctx = ctx;
 
-    // Sınırlayıcı (limiter): %500'e çıkan ses patlamasın, tepeler yumuşakça kısılsın
-    const makeLimiter = () => {
-      const c = ctx.createDynamicsCompressor();
-      c.threshold.value = -2; c.knee.value = 0; c.ratio.value = 20; c.attack.value = 0.002; c.release.value = 0.12;
-      return c;
-    };
+    // Ana yol limiter'sız: çalma ses seviyesi en çok %100, güçlendirme dosyaya işlenir. Limiter (eşik -2 dB, sert)
+    // ses dolu dosyalarda sürekli devreye girip sesi sıkıştırıyordu; arkadaşlara kalın/boğuk gidiyordu.
     this.out = ctx.createGain();
-    this.limiter = makeLimiter();
-    this.out.connect(this.limiter);
-    this.limiter.connect(ctx.destination);
+    this.out.connect(ctx.destination);
 
     this.cableDest = ctx.createMediaStreamDestination();
-    this.limiter.connect(this.cableDest);
+    this.out.connect(this.cableDest);
 
     // Shared reverb bus (voices only send into it when reverb > 0)
     const convolver = ctx.createConvolver();
@@ -124,8 +118,11 @@ class AudioEngine {
     convolver.connect(this.out);
 
     // Yerel yol: yalnızca hoparlöre gider, sanal kabloya (arkadaşlara) geçmez. Kırpma editörü önizlemesi için.
+    // Önizlemede Güçlendir %500'e çıkabildiği için burada limiter var: patlama olmasın, tepeler yumuşakça kısılsın
     this.localOut = ctx.createGain();
-    const localLimiter = makeLimiter();
+    const localLimiter = ctx.createDynamicsCompressor();
+    localLimiter.threshold.value = -2; localLimiter.knee.value = 0; localLimiter.ratio.value = 20;
+    localLimiter.attack.value = 0.002; localLimiter.release.value = 0.12;
     this.localOut.connect(localLimiter);
     localLimiter.connect(ctx.destination);
     const localConv = ctx.createConvolver();
@@ -160,16 +157,19 @@ class AudioEngine {
 
   async _attachCable() {
     if (!this.cableDeviceId) {
-      if (this.cableEl) { this.cableEl.pause(); this.cableEl.srcObject = null; this.cableEl = null; }
+      if (this.cableCtx) { this.cableCtx.close().catch(() => {}); this.cableCtx = null; }
       return;
     }
-    if (!this.cableEl) {
-      this.cableEl = new Audio();
-      this.cableEl.srcObject = this.cableDest.stream;
-    }
     try {
-      await this.cableEl.setSinkId(this.cableDeviceId);
-      await this.cableEl.play();
+      // Akışı <audio> öğesiyle kabloya vermek bir süre sonra sesi ~%11 yavaşlatıyordu (arkadaşlara pes gidiyordu).
+      // Kablo için ayrı bir AudioContext, doğrudan o cihaza bağlanır.
+      if (this.cableCtx && this.cableCtx.setSinkId) {
+        await this.cableCtx.setSinkId(this.cableDeviceId);
+      } else {
+        this.cableCtx = new (window.AudioContext || window.webkitAudioContext)({ sinkId: this.cableDeviceId, latencyHint: 'interactive' });
+        this.cableCtx.createMediaStreamSource(this.cableDest.stream).connect(this.cableCtx.destination);
+      }
+      await this.cableCtx.resume();
     } catch (e) {
       console.warn('Cable output failed:', e.message);
     }

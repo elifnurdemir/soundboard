@@ -538,7 +538,8 @@ ipcMain.handle('finalize-sound-file', async (_, srcPath, name) => {
 });
 
 // ─── YouTube Audio Download ───────────────────────────────────────────────────
-const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)/i;
+const YOUTUBE_URL_RE = /^https?:\/\/(www\.|m\.)?(youtube\.com\/(watch\?v=|shorts\/|clip\/)|youtu\.be\/)/i;
+const YOUTUBE_CLIP_RE = /^https?:\/\/(www\.|m\.)?youtube\.com\/clip\//i;
 
 const YTDLP_FILE = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
 
@@ -564,6 +565,19 @@ ipcMain.handle('download-youtube-audio', async (_, url) => {
   try {
     const YTDlpWrap = require('yt-dlp-wrap-plus').default;
     const ytDlpWrap = new YTDlpWrap(ytDlpPath);
+
+    // Clip linki: yt-dlp ffmpeg olmadan aralık indiremez; videonun tamamı indirilir, clip aralığı kırpma olarak döner
+    let clip = null;
+    if (YOUTUBE_CLIP_RE.test(url)) {
+      const info = JSON.parse(await ytDlpWrap.execPromise([url, '-f', 'bestaudio', '--no-playlist', '--dump-json']));
+      // info.id clip'in kendi kimliği; asıl video kimliği yalnızca küçük resim adreslerinde (i.ytimg.com/vi/<id>/) geçer
+      const videoId = JSON.stringify([info?.thumbnail, info?.thumbnails]).match(/\/vi(?:_webp)?\/([\w-]{11})\//)?.[1];
+      if (!videoId) throw new Error('Clip bilgisi alınamadı');
+      const start = Number(info.section_start) || 0;
+      const end = Number(info.section_end);
+      clip = { start, end: Number.isFinite(end) && end > start ? end : null };
+      url = `https://www.youtube.com/watch?v=${videoId}`;
+    }
 
     const tmpDir = path.join(app.getPath('temp'), 'soundboard-yt');
     fs.mkdirSync(tmpDir, { recursive: true });
@@ -595,7 +609,7 @@ ipcMain.handle('download-youtube-audio', async (_, url) => {
 
     const destPath = moveIntoSoundsFolder(tmpFilePath);
     const title = path.basename(destPath, path.extname(destPath));
-    return { success: true, destPath, title };
+    return { success: true, destPath, title, clip };
   } catch (err) {
     console.error('YouTube download error:', err);
     return { success: false, error: err.message || 'İndirme başarısız oldu' };
