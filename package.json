@@ -20,7 +20,8 @@
     "icon": "node scripts/generate-icon.js",
     "postinstall": "node scripts/download-ytdlp.js && node scripts/download-vbcable.js && node scripts/download-svcl.js",
     "clean-release": "node scripts/clean-release.js",
-    "release": "npm version patch --no-git-tag-version && node scripts/clean-release.js && node scripts/generate-icon.js && vite build && electron-builder --win --x64 --publish always"
+    "release": "npm version patch --no-git-tag-version && node scripts/clean-release.js && node scripts/generate-icon.js && vite build && electron-builder --win --x64 --publish always",
+    "test": "vitest run"
   },
   "build": {
     "appId": "com.soundboard.app",
@@ -128,6 +129,7 @@
     "tailwindcss": "^3.4.4",
     "uuid": "^9.0.1",
     "vite": "^5.3.1",
+    "vitest": "^2.1.9",
     "wait-on": "^7.2.0",
     "zustand": "^4.5.2"
   }
