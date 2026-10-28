@@ -29,7 +29,7 @@ function ColorPicker({ value, onChange }) {
   );
 }
 
-function ShortcutInput({ value, onChange }) {
+export function ShortcutInput({ value, onChange }) {
   const [recording, setRecording] = useState(false);
   const inputRef = useRef(null);
 

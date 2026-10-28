@@ -11,6 +11,7 @@ Padoboard MIT lisanslıdır (bkz. [LICENSE](LICENSE)). Aşağıdaki bileşenler 
 | [adm-zip](https://github.com/cthackers/adm-zip), [uiohook-napi](https://github.com/SnosMe/uiohook-napi), [yt-dlp-wrap-plus](https://github.com/aandrew-me/yt-dlp-wrap) | MIT | ZIP yedek, global kısayol, indirme sarmalayıcısı |
 | [@breezystack/lamejs](https://github.com/shijinyu/lamejs) | **LGPL-3.0** | MP3 kodlama (aşağıya bak) |
 | [uuid](https://github.com/uuidjs/uuid) | MIT | Kimlik üretimi |
+| [Rubik Wet Paint](https://fonts.google.com/specimen/Rubik+Wet+Paint) ([@fontsource/rubik-wet-paint](https://github.com/fontsource/font-files)) | **OFL-1.1** | Sokak buton konseptinin başlık yazı tipi (uygulamaya paketlenir) |
 
 Derleme araçları (Vite, Tailwind, PostCSS, electron-builder vb.) MIT lisanslıdır ve uygulamaya girmez.
 

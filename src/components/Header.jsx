@@ -11,15 +11,15 @@ function WindowControls() {
   };
   return (
     <div className="flex items-center gap-0.5 titlebar-no-drag">
-      <button onClick={() => window.electronAPI?.minimize()} className="w-8 h-8 flex items-center justify-center text-[#5c665a] hover:text-white hover:bg-[#1a1e1a] transition-colors">
+      <button onClick={() => window.electronAPI?.minimize()} title="Küçült" className="w-8 h-8 flex items-center justify-center text-[#5c665a] hover:text-white hover:bg-[#1a1e1a] transition-colors">
         <svg width="9" height="2" viewBox="0 0 9 2" fill="currentColor"><rect width="9" height="1.5" rx="0.75"/></svg>
       </button>
-      <button onClick={handleMax} className="w-8 h-8 flex items-center justify-center text-[#5c665a] hover:text-white hover:bg-[#1a1e1a] transition-colors">
+      <button onClick={handleMax} title={isMax ? 'Önceki boyut' : 'Büyüt'} className="w-8 h-8 flex items-center justify-center text-[#5c665a] hover:text-white hover:bg-[#1a1e1a] transition-colors">
         <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" strokeWidth="1.25">
           <rect x="0.625" y="0.625" width="7.75" height="7.75"/>
         </svg>
       </button>
-      <button onClick={() => window.electronAPI?.close()} className="w-8 h-8 flex items-center justify-center text-[#5c665a] hover:text-white hover:bg-red-600 transition-colors">
+      <button onClick={() => window.electronAPI?.close()} title="Kapat" className="w-8 h-8 flex items-center justify-center text-[#5c665a] hover:text-white hover:bg-red-600 transition-colors">
         <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <line x1="1" y1="1" x2="8" y2="8"/><line x1="8" y1="1" x2="1" y2="8"/>
         </svg>
@@ -32,7 +32,13 @@ export default function Header() {
   const {
     openAddModal, openSettings, stopAllSounds, playingSounds,
     openVoiceChat, openStream, setSearchQuery, searchQuery,
+    settings, updateSettings,
   } = useSoundStore();
+  const volume = settings.globalVolume ?? 1;
+  const toggleMute = () => {
+    if (volume > 0) updateSettings({ globalVolume: 0, lastVolume: volume });
+    else updateSettings({ globalVolume: settings.lastVolume || 1 });
+  };
   const { twitchConnected, obsConnected } = useStreamStore();
   const playingCount = Object.keys(playingSounds).length;
 
@@ -87,12 +93,37 @@ export default function Header() {
         </div>
       )}
 
+      {/* Ana ses seviyesi */}
+      <div className="titlebar-no-drag hidden md:flex items-center gap-1.5 shrink-0" title="Ana ses seviyesi">
+        <button
+          onClick={toggleMute}
+          className="w-7 h-8 flex items-center justify-center text-[#5c665a] hover:text-[#c4ff00] transition-colors"
+          title={volume > 0 ? 'Sesi kapat' : 'Sesi aç'}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/>
+            {volume > 0
+              ? <path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>
+              : <><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></>}
+          </svg>
+        </button>
+        <input
+          type="range" min="0" max="1" step="0.01"
+          value={volume}
+          onChange={(e) => updateSettings({ globalVolume: parseFloat(e.target.value) })}
+          className="w-24 volume-slider"
+          title="Ana ses seviyesi"
+        />
+        <span className="w-8 text-[10px] font-mono text-[#5c665a] text-right">{Math.round(volume * 100)}</span>
+      </div>
+
       {/* Right actions */}
       <div className="flex items-center gap-1 titlebar-no-drag ml-auto">
         {/* STOP ALL */}
         <button
           onClick={stopAllSounds}
           disabled={playingCount === 0}
+          title={`Tüm sesleri durdur${settings.stopAllShortcut ? ` (${settings.stopAllShortcut})` : ''}`}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold font-mono tracking-wider transition-all ${
             playingCount > 0
               ? 'bg-red-600 hover:bg-red-500 text-white'
@@ -146,6 +177,7 @@ export default function Header() {
         <button
           onClick={() => openAddModal()}
           className="btn-accent flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold font-mono tracking-wider"
+          title="Yeni ses ekle (dosyayı pencereye sürükleyip de bırakabilirsin)"
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -154,7 +186,7 @@ export default function Header() {
         </button>
 
         {/* Settings */}
-        <button onClick={openSettings} className="w-8 h-8 flex items-center justify-center text-[#5c665a] hover:text-[#c4ff00] hover:bg-app-surface transition-colors">
+        <button onClick={openSettings} title="Ayarlar" className="w-8 h-8 flex items-center justify-center text-[#5c665a] hover:text-[#c4ff00] hover:bg-app-surface transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>

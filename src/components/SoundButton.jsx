@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import useSoundStore, { adaptColorForTheme } from '../store/useSoundStore';
+import ContextMenu from './ContextMenu';
+import { SokakWall, SprayTitle } from './sokak';
 
 function PlayingBars() {
   return (
@@ -35,14 +37,17 @@ function CooldownRing({ progress, color }) {
 
 const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 
-export default function SoundButton({ sound }) {
+// sokak: Sokak konsepti için { color, rot, dx, dy } (SoundGrid, ızgara sırasına göre atar)
+export default function SoundButton({ sound, sokak }) {
   const {
     playSound, stopSoundWithFade, playingSounds,
     updateSound, openAddModal, deleteSound, getCooldownProgress,
-    toggleFavorite, settings,
+    toggleFavorite, settings, categories, askConfirm, permanentlyDeleteSound,
   } = useSoundStore();
 
-  const displayColor = adaptColorForTheme(sound.color, settings.theme);
+  const isSokak = settings.buttonConcept === 'sokak' && !!sokak;
+  const displayColor = isSokak ? sokak.color : adaptColorForTheme(sound.color, settings.theme);
+  const [menu, setMenu] = useState(null); // sağ tık menüsü konumu { x, y }
 
   const isPlaying = !!(playingSounds[sound.id]?.length);
   const instanceCount = playingSounds[sound.id]?.length || 0;
@@ -127,6 +132,33 @@ export default function SoundButton({ sound }) {
     else playSound(sound);
   };
 
+  const menuItems = [
+    { label: isPlaying ? 'Durdur' : 'Çal', onClick: () => (isPlaying ? stopSoundWithFade(sound.id, sound) : playSound(sound)) },
+    { label: 'Düzenle', onClick: () => openAddModal(sound) },
+    { label: sound.favorite ? 'Favorilerden çıkar' : 'Favorilere ekle', onClick: () => toggleFavorite(sound.id) },
+    { separator: true },
+    { header: 'Kategoriye taşı' },
+    ...categories.map((c) => ({
+      label: c.name,
+      checked: c.id === sound.categoryId,
+      disabled: c.id === sound.categoryId,
+      onClick: () => updateSound(sound.id, { categoryId: c.id }),
+    })),
+    { separator: true },
+    { label: 'Çöp kutusuna taşı', onClick: () => deleteSound(sound.id) },
+    {
+      label: 'Dosyasıyla birlikte kalıcı sil…',
+      danger: true,
+      onClick: () => askConfirm({
+        title: 'Kalıcı sil',
+        message: `"${sound.name}" ve ses dosyası diskten silinecek. Bu işlem geri alınamaz.\n\nGeri alınabilir silme için "Çöp kutusuna taşı"yı kullan.`,
+        confirmLabel: 'KALICI SİL',
+        danger: true,
+        onConfirm: () => permanentlyDeleteSound(sound.id),
+      }),
+    },
+  ];
+
   const handleVolumeChange = (e) => {
     const vol = parseFloat(e.target.value);
     updateSound(sound.id, { volume: vol });
@@ -137,7 +169,7 @@ export default function SoundButton({ sound }) {
 
   const { r, g, b } = hexToRgb(displayColor || '#c4ff00');
   const bright = (r * 299 + g * 587 + b * 114) / 1000;
-  const textColor = bright > 140 ? 'text-black/80' : 'text-white';
+  const textColor = isSokak || bright <= 140 ? 'text-white' : 'text-black/80'; // Sokak zemini koyu tuğla
   const isOnCooldown = sound.cooldown > 0 && cooldown < 1;
 
   return (
@@ -150,7 +182,9 @@ export default function SoundButton({ sound }) {
       onDragOver={handleImageDragOver}
       onDragLeave={() => setImageOver(false)}
       onDrop={handleImageDrop}
+      onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}
     >
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
 
       {/* Drag handle */}
       {showControls && (
@@ -175,10 +209,11 @@ export default function SoundButton({ sound }) {
           gap-1.5 overflow-hidden transition-all duration-150 select-none
           ${isPlaying ? 'playing-pulse' : isOnCooldown ? 'opacity-60 cursor-not-allowed' : 'hover:scale-[1.04] hover:brightness-110'}
           focus:outline-none
+          ${isSokak ? 'sokak-btn' : ''}
           ${imageOver ? 'ring-2 ring-white scale-[1.06]' : ''}
         `}
         style={{
-          backgroundColor: (sound.image && sound.noColor) ? '#0b0d0b' : displayColor,
+          backgroundColor: isSokak ? '#2a130e' : (sound.image && sound.noColor) ? '#0b0d0b' : displayColor,
           backgroundImage: sound.image ? `url("soundboard:///${sound.image.replace(/\\/g, '/').replace(/ /g, '%20')}")` : undefined,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -188,12 +223,16 @@ export default function SoundButton({ sound }) {
         }}
         title={`${sound.name}${sound.shortcut ? ` [${sound.shortcut}]` : ''}`}
       >
+        {/* Sokak: görsel yoksa tuğla duvar, varsa görselin üstüne koyu perde (başlık okunsun) */}
+        {isSokak && (sound.image
+          ? <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(0,0,0,0.35)' }}/>
+          : <SokakWall dx={sokak.dx} dy={sokak.dy} />)}
         {/* Image color overlay — keeps text readable */}
-        {sound.image && !sound.noColor && (
+        {!isSokak && sound.image && !sound.noColor && (
           <div className="absolute inset-0 pointer-events-none" style={{ background: `${displayColor}99` }}/>
         )}
         {/* Shine overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/12 to-transparent pointer-events-none"/>
+        {!isSokak && <div className="absolute inset-0 bg-gradient-to-br from-white/12 to-transparent pointer-events-none"/>}
         {/* Sonar circles — contained by button's overflow:hidden */}
         {isPlaying && (
           <>
@@ -210,23 +249,33 @@ export default function SoundButton({ sound }) {
         {/* Cooldown ring */}
         {isOnCooldown && <CooldownRing progress={cooldown} color="rgba(255,255,255,0.6)"/>}
 
-        {/* Icon */}
-        <div className={`relative z-10 ${textColor}`}>
-          {isPlaying ? <PlayingBars /> : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          )}
-        </div>
+        {isSokak ? (
+          <>
+            {/* Sokak: başlık boyanmış, çalarken köşede ses çubukları */}
+            <SprayTitle text={sound.name} color={sokak.color} rot={sokak.rot} />
+            {isPlaying && <div className="absolute top-1.5 right-1.5 z-10 text-white"><PlayingBars /></div>}
+          </>
+        ) : (
+          <>
+            {/* Icon */}
+            <div className={`relative z-10 ${textColor}`}>
+              {isPlaying ? <PlayingBars /> : (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              )}
+            </div>
 
-        {/* Name */}
-        <div
-          className={`relative z-10 text-sm font-bold px-2 text-center leading-tight line-clamp-2 max-w-full font-mono tracking-wide ${sound.image && sound.noColor ? 'text-white' : textColor}`}
-          style={sound.image && sound.noColor ? { textShadow: '0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8)' } : {}}
-        >
-          {sound.name}
-        </div>
+            {/* Name */}
+            <div
+              className={`relative z-10 text-sm font-bold px-2 text-center leading-tight line-clamp-2 max-w-full font-mono tracking-wide ${sound.image && sound.noColor ? 'text-white' : textColor}`}
+              style={sound.image && sound.noColor ? { textShadow: '0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8)' } : {}}
+            >
+              {sound.name}
+            </div>
+          </>
+        )}
 
         {/* Badges */}
-        <div className="relative z-10 flex items-center gap-1 flex-wrap justify-center">
+        <div className={`z-10 flex items-center gap-1 flex-wrap justify-center ${isSokak ? 'absolute bottom-1.5 left-0 right-0' : 'relative'}`}>
           {sound.shortcut && (
             <span className={`text-[9px] px-1.5 py-0.5 bg-black/30 ${textColor} font-mono tracking-wider`}>{sound.shortcut}</span>
           )}
@@ -287,6 +336,7 @@ export default function SoundButton({ sound }) {
           <button
             onClick={(e) => { e.stopPropagation(); openAddModal(sound); }}
             className={`${ctrlBtn} flex items-center justify-center bg-black/60 hover:bg-black/85 backdrop-blur-sm text-white/80 hover:text-white transition-colors`}
+            title="Düzenle"
           >
             <svg width={ctrlIcon} height={ctrlIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -296,6 +346,7 @@ export default function SoundButton({ sound }) {
           <button
             onClick={(e) => { e.stopPropagation(); deleteSound(sound.id); }}
             className={`${ctrlBtn} flex items-center justify-center bg-black/60 hover:bg-red-600/80 backdrop-blur-sm text-white/80 hover:text-white transition-colors`}
+            title="Çöp kutusuna taşı (sağ tık: dosyasıyla sil)"
           >
             <svg width={ctrlIcon} height={ctrlIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6"/>

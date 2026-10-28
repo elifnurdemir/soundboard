@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import useSoundStore from "../store/useSoundStore";
 import useLicenseStore, { LICENSING_ENABLED } from "../store/useLicenseStore";
 import ProGate from "./ProGate";
+import { ShortcutInput } from "./AddSoundModal";
 
 function UpdateChecker() {
   const [status, setStatus] = useState('idle'); // idle | checking | latest | available | downloading | ready
@@ -171,7 +172,7 @@ function Row({ label, description, children }) {
 }
 
 export default function SettingsPanel() {
-  const { settings, updateSettings, closeSettings, sounds, categories } =
+  const { settings, updateSettings, closeSettings, sounds, categories, trash, setActiveCategory } =
     useSoundStore();
   const [dataPath, setDataPath] = useState("");
   const [soundsFolder, setSoundsFolder] = useState("");
@@ -293,6 +294,36 @@ export default function SettingsPanel() {
               </div>
             </div>
 
+            <div className="p-3 bg-app-surface border border-app-border space-y-2">
+              <p className="text-sm font-medium text-white">Buton Konsepti</p>
+              <div className="flex gap-2">
+                {[
+                  { id: 'classic', label: 'KLASİK', hint: 'Renkli düz butonlar' },
+                  { id: 'sokak', label: 'SOKAK', hint: 'Tuğla duvar, sprey başlık' },
+                ].map((c) => {
+                  const active = (settings.buttonConcept || 'classic') === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => updateSettings({ buttonConcept: c.id })}
+                      title={c.hint}
+                      className="flex-1 py-2 border text-xs font-bold font-mono tracking-wider transition-colors"
+                      style={{
+                        borderColor: active ? 'var(--accent)' : 'var(--border)',
+                        background: active ? 'rgba(196,255,0,0.1)' : 'var(--input)',
+                        color: active ? 'var(--accent)' : '#8e9c8b',
+                      }}
+                    >
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] font-mono" style={{ color: '#5c665a' }}>
+                Sokak konseptinde buton rengi ve eğimi otomatik atanır, kendi görselini yüklediğin butonlarda görsel görünür.
+              </p>
+            </div>
+
             <Row label="Satırdaki Buton" description={`${Math.min(20, Math.max(1, settings.gridColumns || 5))} buton`}>
               <input
                 type="range" min="1" max="20" step="1"
@@ -328,6 +359,17 @@ export default function SettingsPanel() {
                 className="w-28 volume-slider"
               />
             </Row>
+
+            <div className="p-3 bg-app-surface border border-app-border space-y-2">
+              <p className="text-sm font-medium text-white">Hepsini Durdur Kısayolu</p>
+              <p className="text-xs font-mono" style={{ color: "#5c665a" }}>
+                Uygulama arka plandayken de çalışır. Takılan bir sesi anında susturur.
+              </p>
+              <ShortcutInput
+                value={settings.stopAllShortcut || ''}
+                onChange={(v) => updateSettings({ stopAllShortcut: v })}
+              />
+            </div>
           </Section>
 
           {/* Veri */}
@@ -371,6 +413,15 @@ export default function SettingsPanel() {
                 )}
               </div>
             )}
+
+            <button
+              onClick={() => { setActiveCategory('trash'); closeSettings(); }}
+              className="w-full p-3 bg-app-surface border border-app-border hover:border-[rgba(196,255,0,0.3)] flex items-center justify-between text-xs font-mono text-[#8e9c8b] hover:text-[#c4ff00] transition-colors"
+              title="Silinen sesleri geri al, kayıt dışı dosyaları temizle"
+            >
+              <span>Çöp kutusu ve dosya temizliği</span>
+              <span>{trash.length} →</span>
+            </button>
 
             <div className="p-3 bg-app-surface border border-app-border flex items-center justify-between">
               <p className="text-xs font-mono text-[#8e9c8b]">İstatistikler</p>

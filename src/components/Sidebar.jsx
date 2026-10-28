@@ -78,7 +78,7 @@ function CategoryItem({ category, isActive, soundCount, onSelect, onEdit, onDele
 }
 
 export default function Sidebar() {
-  const { categories, sounds, activeCategory, setActiveCategory, addCategory, updateCategory, deleteCategory } = useSoundStore();
+  const { categories, sounds, trash, activeCategory, setActiveCategory, addCategory, updateCategory, deleteCategory } = useSoundStore();
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCatName, setNewCatName] = useState('');
 
@@ -214,6 +214,27 @@ export default function Sidebar() {
           </button>
         )}
       </nav>
+
+      {/* Çöp kutusu */}
+      <div
+        className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-all mx-1 mb-1 ${
+          activeCategory === 'trash'
+            ? 'bg-[rgba(196,255,0,0.08)] border-l-2'
+            : 'text-[#8e9c8b] hover:bg-app-surface hover:text-[#d0d8ce]'
+        }`}
+        style={activeCategory === 'trash' ? { borderLeftColor: 'var(--accent)', color: 'var(--accent)' } : {}}
+        onClick={() => setActiveCategory('trash')}
+        title="Silinen sesler 30 gün burada kalır"
+      >
+        <svg className="shrink-0" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        </svg>
+        <span className="text-sm flex-1 font-mono">Çöp Kutusu</span>
+        <span className={`text-[10px] px-1.5 py-0.5 font-mono ${activeCategory === 'trash' ? 'text-[#c4ff00]/70 bg-[rgba(196,255,0,0.12)]' : 'bg-app-raised text-[#5c665a]'}`}>
+          {trash.length}
+        </span>
+      </div>
 
       {/* Footer */}
       <div className="border-t border-app-border">

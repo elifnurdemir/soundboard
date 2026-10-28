@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import useSoundStore from './store/useSoundStore';
+import useSoundStore, { STOP_ALL_ID } from './store/useSoundStore';
 import useStreamStore from './store/useStreamStore';
 import useLicenseStore from './store/useLicenseStore';
 import useRoomStore from './store/useRoomStore';
@@ -16,6 +16,9 @@ import VoiceChatPanel from './components/VoiceChatPanel';
 import StreamPanel from './components/StreamPanel';
 import UpdateBanner from './components/UpdateBanner';
 import SoundQueue from './components/SoundQueue';
+import ConfirmDialog from './components/ConfirmDialog';
+import Toast from './components/Toast';
+import { SokakDefs } from './components/sokak';
 
 const AUDIO_VIDEO_RE = /\.(mp3|wav|ogg|flac|m4a|aac|opus|wma|mp4|webm|mkv|mov|avi|m4v)$/i;
 
@@ -94,11 +97,13 @@ export default function App() {
   useEffect(() => {
     if (window.electronAPI) {
       const withShortcut = sounds.filter((s) => s.shortcut);
-      window.electronAPI.registerShortcuts(
-        withShortcut.map((s) => ({ soundId: s.id, shortcut: s.shortcut }))
-      );
+      const registered = withShortcut.map((s) => ({ soundId: s.id, shortcut: s.shortcut }));
+      if (settings.stopAllShortcut) registered.push({ soundId: STOP_ALL_ID, shortcut: settings.stopAllShortcut });
+      window.electronAPI.registerShortcuts(registered);
       window.electronAPI.offShortcutTriggered();
       window.electronAPI.onShortcutTriggered((soundId) => {
+        // Hepsini durdur: yazı yazarken de çalışır, bir acil durum tuşudur
+        if (soundId === STOP_ALL_ID) { useSoundStore.getState().stopAllSounds(); return; }
         // Yazı yazarken ya da Ses Ekle penceresi açıkken (kırpma editöründe Boşluk çal/durdur) kısayol sesleri tetiklenmesin
         const el = document.activeElement;
         const typing = !!el && (el.tagName === 'TEXTAREA' || el.isContentEditable || (el.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'submit'].includes(el.type)));
@@ -114,6 +119,11 @@ export default function App() {
     // Fallback for browser mode
     const handler = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+      if (matchesShortcut(e, settings.stopAllShortcut)) {
+        e.preventDefault();
+        useSoundStore.getState().stopAllSounds();
+        return;
+      }
       for (const sound of sounds) {
         if (!sound.shortcut) continue;
         if (matchesShortcut(e, sound.shortcut)) {
@@ -127,7 +137,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [sounds, playSound, stopSoundWithFade]);
+  }, [sounds, playSound, stopSoundWithFade, settings.stopAllShortcut]);
 
   // Twitch chat command listener
   useEffect(() => {
@@ -170,6 +180,9 @@ export default function App() {
       {isSetupOpen && <SetupWizard />}
       <UpdateBanner />
       <SoundQueue />
+      <Toast />
+      <ConfirmDialog />
+      <SokakDefs />
     </div>
   );
 }

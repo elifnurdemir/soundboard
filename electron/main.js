@@ -498,6 +498,25 @@ ipcMain.handle('open-sounds-folder', () => {
   shell.openPath(folder);
 });
 
+// Dosyayla silme ve kayıt dışı dosya tarama. Silme yalnızca uygulamanın ses ve görsel
+// klasörleriyle sınırlıdır (bkz. files.js), kullanıcının başka yerdeki dosyalarına dokunmaz.
+const fileOps = require('./files');
+ipcMain.handle('delete-files', (_, paths) => {
+  try {
+    const roots = [getSoundsFolder(), path.join(app.getPath('userData'), 'images')];
+    return { success: true, ...fileOps.deleteFiles(roots, Array.isArray(paths) ? paths : []) };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+ipcMain.handle('find-orphan-files', (_, referenced) => {
+  try {
+    return { success: true, files: fileOps.findOrphans(getSoundsFolder(), Array.isArray(referenced) ? referenced : []) };
+  } catch (err) {
+    return { success: false, error: err.message, files: [] };
+  }
+});
+
 // Dosya adı için güvenli hâl: yasak karakterleri at, uzunluğu sınırla (boşsa "ses")
 const safeFileBase = (n) => String(n || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'ses';
 function uniqueInSounds(base, ext) {

@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   finalizeSoundFile: (srcPath, name) => ipcRenderer.invoke('finalize-sound-file', srcPath, name),
   getSoundsFolder: () => ipcRenderer.invoke('get-sounds-folder'),
   openSoundsFolder: () => ipcRenderer.invoke('open-sounds-folder'),
+  deleteFiles: (paths) => ipcRenderer.invoke('delete-files', paths),
+  findOrphanFiles: (referenced) => ipcRenderer.invoke('find-orphan-files', referenced),
   openImageDialog: () => ipcRenderer.invoke('open-image-dialog'),
   copyImageFile: (srcPath, keepOriginal = false) => ipcRenderer.invoke('copy-image-file', srcPath, keepOriginal),
   openFolderDialog: () => ipcRenderer.invoke('open-folder-dialog'),

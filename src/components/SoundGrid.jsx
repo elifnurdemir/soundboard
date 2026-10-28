@@ -15,6 +15,8 @@ import SoundButton from './SoundButton';
 import KeyboardView from './KeyboardView';
 import { PadoMascot } from './Pado';
 import OnlineBoard from './OnlineBoard';
+import TrashBoard from './TrashBoard';
+import { assignSokak } from '../store/sokak';
 
 function EmptyState({ onAdd, isFiltered }) {
   return (
@@ -100,6 +102,7 @@ export default function SoundGrid() {
 
   // Kenar çubuğundan "Çevrimiçi Sesler": yerel butonlar yerine Openverse'teki sesler
   if (activeCategory === 'online') return <OnlineBoard />;
+  if (activeCategory === 'trash') return <TrashBoard />;
 
   if (viewMode === 'keyboard') {
     return (
@@ -119,15 +122,19 @@ export default function SoundGrid() {
     );
   }
 
-  const renderGrid = (sounds) => (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={sounds.map((s) => s.id)} strategy={rectSortingStrategy}>
-        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-          {sounds.map((sound) => <SoundButton key={sound.id} sound={sound} />)}
-        </div>
-      </SortableContext>
-    </DndContext>
-  );
+  // Sokak konsepti: komşu butonlar aynı rengi almasın diye renkler ızgara sırasına göre atanır
+  const renderGrid = (sounds) => {
+    const sokak = settings.buttonConcept === 'sokak' ? assignSokak(sounds.map((s) => s.id), cols) : null;
+    return (
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={sounds.map((s) => s.id)} strategy={rectSortingStrategy}>
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+            {sounds.map((sound, i) => <SoundButton key={sound.id} sound={sound} sokak={sokak ? sokak[i] : undefined} />)}
+          </div>
+        </SortableContext>
+      </DndContext>
+    );
+  };
 
   if (activeCategory === 'all' && !searchQuery.trim()) {
     const grouped = categories.map((cat) => ({

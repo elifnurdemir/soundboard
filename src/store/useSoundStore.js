@@ -3,6 +3,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { voiceChatRouter } from '../audio/VoiceChatRouter';
 import { audioEngine } from '../audio/AudioEngine';
 import useLicenseStore from './useLicenseStore';
+import { splitExpired, unreferencedFiles, orphanToSound } from './trash';
+
+export const STOP_ALL_ID = '__stop_all__';
 
 export const PRESET_COLORS = [
   '#7d2626', '#7d4220', '#7a5010', '#4a6318',
@@ -55,6 +58,8 @@ const DEFAULT_SETTINGS = {
   viewMode: 'grid',        // 'grid' | 'keyboard'
   keyboardLayout: '75',
   keyboardZoom: 1,
+  stopAllShortcut: 'Ctrl+Alt+X', // her yerde çalışan "hepsini durdur" kısayolu
+  buttonConcept: 'classic',      // buton konsepti: 'classic' | 'sokak'
 };
 
 const DEFAULT_CATEGORIES = [
@@ -69,10 +74,55 @@ function buildAudioUrl(filePath) {
   return /^[A-Za-z]:/.test(n) ? `file:///${n}` : `file://${n}`;
 }
 
+// Ses kaydını varsayılanlarla tamamlar. Yeni ses eklerken ve çöp kutusundan geri alırken ortak kullanılır.
+function buildSound(data, order, theme) {
+  return {
+    id: data.id || uuidv4(),
+    name: data.name || 'Yeni Ses',
+    filePath: data.filePath,
+    color: data.color || randomColor(theme),
+    volume: data.volume ?? 0.8,
+    shortcut: data.shortcut || '',
+    categoryId: data.categoryId || 'default',
+    order,
+    loop: data.loop ?? false,
+    fadeIn: data.fadeIn ?? 0,
+    fadeOut: data.fadeOut ?? 0,
+    trimStart: data.trimStart ?? 0,
+    trimEnd: data.trimEnd ?? null,
+    playbackRate: data.playbackRate ?? 1,
+    bass: data.bass ?? 0,
+    treble: data.treble ?? 0,
+    reverb: data.reverb ?? 0,
+    favorite: data.favorite ?? false,
+    playCount: data.playCount ?? 0,
+    cooldown: data.cooldown ?? 0,
+    overlap: data.overlap ?? true,
+    chatCommand: data.chatCommand || '',
+    image: data.image || '',
+    noColor: data.noColor ?? false,
+    credit: data.credit || null, // çevrimiçi kaynaktan geldiyse yazar/lisans/kaynak bilgisi
+    createdAt: data.createdAt || Date.now(),
+  };
+}
+
+// Kullanılmayan dosyaları diskten siler. Başka bir ses ya da çöp kutusu kaydı hâlâ kullanıyorsa dokunmaz.
+async function deleteUnusedFiles(removed, stillUsed) {
+  const files = unreferencedFiles(removed, stillUsed);
+  const total = removed.flatMap((s) => [s.filePath, s.image]).filter(Boolean).length;
+  if (!window.electronAPI?.deleteFiles || !files.length) return { deleted: 0, failed: 0, shared: total > 0 && !files.length };
+  const res = await window.electronAPI.deleteFiles(files);
+  return { deleted: res?.deleted?.length || 0, failed: res?.failed?.length || 0, shared: files.length < total };
+}
+
 const useSoundStore = create((set, get) => ({
   // ─── State ──────────────────────────────────────────────────────────────
   categories: DEFAULT_CATEGORIES,
   sounds: [],
+  // Çöp kutusu: [{ trashId, sound, deletedAt }] — 30 gün sonra dosyalarıyla birlikte silinir
+  trash: [],
+  confirmDialog: null, // { title, message, confirmLabel, danger, onConfirm }
+  toast: null,         // { id, message, trashId? } — trashId varsa "geri al" düğmesi çıkar
   settings: { ...DEFAULT_SETTINGS },
   activeCategory: 'all',
   searchQuery: '',
@@ -100,6 +150,7 @@ const useSoundStore = create((set, get) => ({
           set({
             categories: data.categories?.length ? data.categories : DEFAULT_CATEGORIES,
             sounds: (data.sounds || []).map((s) => (s.volume > 1 ? { ...s, volume: 1 } : s)),
+            trash: Array.isArray(data.trash) ? data.trash : [],
             settings: { ...DEFAULT_SETTINGS, ...(data.settings || {}) },
           });
         }
@@ -111,6 +162,7 @@ const useSoundStore = create((set, get) => ({
           set({
             categories: data.categories?.length ? data.categories : DEFAULT_CATEGORIES,
             sounds: data.sounds || [],
+            trash: Array.isArray(data.trash) ? data.trash : [],
             settings: { ...DEFAULT_SETTINGS, ...(data.settings || {}) },
           });
         }
@@ -119,6 +171,8 @@ const useSoundStore = create((set, get) => ({
       console.error('Load error:', err);
     } finally {
       set({ isLoaded: true });
+      // 30 günü dolan silinmişleri dosyalarıyla birlikte temizle
+      get().purgeExpiredTrash().catch((e) => console.error('Trash purge:', e));
       // Sesleri önceden hazırla: ilk basışta decode beklenmesin (en çok çalınan önce)
       audioEngine.warm([...get().sounds].filter((s) => s.filePath).sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 300)
         .map((s) => ({ url: buildAudioUrl(s.filePath), trimStart: s.trimStart ?? 0, trimEnd: s.trimEnd ?? null }))).catch(() => {});
@@ -131,13 +185,13 @@ const useSoundStore = create((set, get) => ({
   },
 
   saveData: async () => {
-    const { categories, sounds, settings } = get();
+    const { categories, sounds, settings, trash } = get();
     try {
       if (window.electronAPI) {
-        await window.electronAPI.saveData({ categories, sounds, settings });
+        await window.electronAPI.saveData({ categories, sounds, settings, trash });
       } else {
         // Tarayıcı: localStorage'a kaydet
-        localStorage.setItem('soundboard-data', JSON.stringify({ categories, sounds, settings }));
+        localStorage.setItem('soundboard-data', JSON.stringify({ categories, sounds, settings, trash }));
       }
     } catch (err) {
       console.error('Save error:', err);
@@ -148,34 +202,7 @@ const useSoundStore = create((set, get) => ({
   addSound: (data) => {
     const sounds = get().sounds;
     const maxOrder = sounds.reduce((m, s) => Math.max(m, s.order ?? 0), -1);
-    const s = {
-      id: uuidv4(),
-      name: data.name || 'Yeni Ses',
-      filePath: data.filePath,
-      color: data.color || randomColor(get().settings.theme),
-      volume: data.volume ?? 0.8,
-      shortcut: data.shortcut || '',
-      categoryId: data.categoryId || 'default',
-      order: maxOrder + 1,
-      loop: data.loop ?? false,
-      fadeIn: data.fadeIn ?? 0,
-      fadeOut: data.fadeOut ?? 0,
-      trimStart: data.trimStart ?? 0,
-      trimEnd: data.trimEnd ?? null,
-      playbackRate: data.playbackRate ?? 1,
-      bass: data.bass ?? 0,
-      treble: data.treble ?? 0,
-      reverb: data.reverb ?? 0,
-      favorite: data.favorite ?? false,
-      playCount: data.playCount ?? 0,
-      cooldown: data.cooldown ?? 0,
-      overlap: data.overlap ?? true,
-      chatCommand: data.chatCommand || '',
-      image: data.image || '',
-      noColor: data.noColor ?? false,
-      credit: data.credit || null, // çevrimiçi kaynaktan geldiyse yazar/lisans/kaynak bilgisi
-      createdAt: Date.now(),
-    };
+    const s = buildSound({ ...data, id: undefined, createdAt: undefined }, maxOrder + 1, get().settings.theme);
     set((state) => ({ sounds: [...state.sounds, s] }));
     if (s.filePath) audioEngine.preload(buildAudioUrl(s.filePath), s.trimStart, s.trimEnd);
     get().saveData();
@@ -191,11 +218,97 @@ const useSoundStore = create((set, get) => ({
     get().saveData();
   },
 
+  // Silme: sesi çöp kutusuna taşır (dosya yerinde kalır, 30 gün kurtarılabilir)
   deleteSound: (id) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (!sound) return;
+    get().stopAllInstancesOf(id);
+    const entry = { trashId: uuidv4(), sound, deletedAt: Date.now() };
+    set((state) => ({
+      sounds: state.sounds.filter((s) => s.id !== id),
+      trash: [entry, ...state.trash],
+      toast: { id: entry.trashId, message: `"${sound.name}" çöp kutusuna taşındı`, trashId: entry.trashId },
+    }));
+    get().saveData();
+  },
+
+  // Sesi ve dosyasını kalıcı siler (çöp kutusuna uğramaz)
+  permanentlyDeleteSound: async (id) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (!sound) return;
     get().stopAllInstancesOf(id);
     set((state) => ({ sounds: state.sounds.filter((s) => s.id !== id) }));
     get().saveData();
+    const { sounds, trash } = get();
+    const r = await deleteUnusedFiles([sound], [...sounds, ...trash.map((t) => t.sound)]);
+    get().showToast(
+      r.failed ? `"${sound.name}" silindi ama dosya silinemedi`
+        : r.shared ? `"${sound.name}" silindi (dosyası başka bir sesle paylaşıldığı için korundu)`
+        : `"${sound.name}" ve dosyası silindi`
+    );
   },
+
+  restoreFromTrash: (trashId) => {
+    const entry = get().trash.find((t) => t.trashId === trashId);
+    if (!entry) return;
+    const { sounds, categories, settings } = get();
+    const maxOrder = sounds.reduce((m, s) => Math.max(m, s.order ?? 0), -1);
+    const categoryId = categories.some((c) => c.id === entry.sound.categoryId) ? entry.sound.categoryId : 'default';
+    const restored = buildSound({ ...entry.sound, categoryId }, maxOrder + 1, settings.theme);
+    set((state) => ({
+      sounds: [...state.sounds, restored],
+      trash: state.trash.filter((t) => t.trashId !== trashId),
+      toast: state.toast?.trashId === trashId ? null : state.toast,
+    }));
+    if (restored.filePath) audioEngine.preload(buildAudioUrl(restored.filePath), restored.trimStart, restored.trimEnd);
+    get().saveData();
+  },
+
+  // Çöp kutusundan seçili kayıtları dosyalarıyla birlikte kalıcı siler
+  deleteFromTrash: async (trashIds) => {
+    const ids = new Set(trashIds);
+    const removed = get().trash.filter((t) => ids.has(t.trashId)).map((t) => t.sound);
+    if (!removed.length) return { deleted: 0, failed: 0, shared: false };
+    set((state) => ({ trash: state.trash.filter((t) => !ids.has(t.trashId)) }));
+    get().saveData();
+    const { sounds, trash } = get();
+    return deleteUnusedFiles(removed, [...sounds, ...trash.map((t) => t.sound)]);
+  },
+
+  emptyTrash: async () => {
+    const r = await get().deleteFromTrash(get().trash.map((t) => t.trashId));
+    get().showToast(r.failed ? 'Çöp kutusu boşaltıldı ama bazı dosyalar silinemedi' : 'Çöp kutusu boşaltıldı');
+  },
+
+  purgeExpiredTrash: async () => {
+    const { expired } = splitExpired(get().trash);
+    if (expired.length) await get().deleteFromTrash(expired.map((t) => t.trashId));
+  },
+
+  // Hiçbir sese bağlı olmayan dosyaları çöp kutusuna koyar (30 gün geri alınabilir)
+  trashOrphanFiles: (files) => {
+    const known = new Set(get().trash.map((t) => String(t.sound.filePath).toLowerCase()));
+    const now = Date.now();
+    const entries = files
+      .filter((f) => !known.has(String(f.path).toLowerCase()))
+      .map((f) => ({ trashId: uuidv4(), sound: orphanToSound(f, uuidv4()), deletedAt: now, orphan: true }));
+    if (!entries.length) return 0;
+    set((state) => ({ trash: [...entries, ...state.trash] }));
+    get().saveData();
+    return entries.length;
+  },
+
+  // Kayıt dışı dosyaları doğrudan kalıcı siler
+  deleteOrphanFiles: async (files) => {
+    if (!window.electronAPI?.deleteFiles || !files.length) return 0;
+    const res = await window.electronAPI.deleteFiles(files.map((f) => f.path));
+    return res?.deleted?.length || 0;
+  },
+
+  showToast: (message, trashId) => set({ toast: { id: uuidv4(), message, trashId } }),
+  clearToast: () => set({ toast: null }),
+  askConfirm: (dialog) => set({ confirmDialog: dialog }),
+  closeConfirm: () => set({ confirmDialog: null }),
 
   toggleFavorite: (id) => {
     set((state) => ({
@@ -413,7 +526,7 @@ const useSoundStore = create((set, get) => ({
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
   getFilteredSounds: () => {
-    const { sounds, activeCategory, searchQuery } = get();
+    const { sounds, activeCategory, searchQuery, categories } = get();
     let filtered = sounds;
     let sortFn = (a, b) => (a.order ?? 0) - (b.order ?? 0);
 
@@ -428,8 +541,12 @@ const useSoundStore = create((set, get) => ({
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
+      const catName = (id) => (categories.find((c) => c.id === id)?.name || '').toLowerCase();
       filtered = filtered.filter(
-        (s) => s.name.toLowerCase().includes(q) || (s.chatCommand || '').toLowerCase().includes(q)
+        (s) => s.name.toLowerCase().includes(q)
+          || (s.chatCommand || '').toLowerCase().includes(q)
+          || (s.shortcut || '').toLowerCase().includes(q)
+          || catName(s.categoryId).includes(q)
       );
     }
     const sorted = [...filtered].sort(sortFn);
