@@ -14,6 +14,7 @@ import AddSoundModal from './components/AddSoundModal';
 import SettingsPanel from './components/SettingsPanel';
 import VoiceChatPanel from './components/VoiceChatPanel';
 import StreamPanel from './components/StreamPanel';
+import TtsPanel from './components/TtsPanel';
 import UpdateBanner from './components/UpdateBanner';
 import SoundQueue from './components/SoundQueue';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -38,7 +39,7 @@ export default function App() {
   const {
     loadData, isLoaded, settings, sounds, playSound, stopSoundWithFade,
     stopAllInstancesOf, playingSounds,
-    isAddModalOpen, isSettingsOpen, isVoiceChatOpen, isStreamOpen,
+    isAddModalOpen, isSettingsOpen, isVoiceChatOpen, isStreamOpen, isTtsOpen,
     openAddModalWithFile,
   } = useSoundStore();
 
@@ -74,6 +75,15 @@ export default function App() {
     document.documentElement.dataset.theme = allowed ? requested : 'dark';
   }, [settings.theme, licenseStatus]);
 
+  // .padopack dosyasına çift tıklanınca: ilk açılışta bekleyen paket, uygulama açıkken gelen paket
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!isLoaded || !api?.takePendingPack) return;
+    api.takePendingPack().then((p) => { if (p) useSoundStore.getState().importPack(p); });
+    api.onPackOpen((p) => useSoundStore.getState().importPack(p));
+    return () => api.offPackOpen();
+  }, [isLoaded]);
+
   // Global drag & drop — drop an audio/video file anywhere to open "Ses Ekle" with it preloaded.
   // Skipped while a modal is already open — its own dropzone handles that case.
   useEffect(() => {
@@ -82,6 +92,7 @@ export default function App() {
       e.preventDefault();
       if (isAddModalOpen) return;
       const file = e.dataTransfer?.files?.[0];
+      if (file && /\.padopack$/i.test(file.name) && file.path) { useSoundStore.getState().importPack(file.path); return; }
       if (!file || !AUDIO_VIDEO_RE.test(file.name)) return; // görseller butonlara bırakılır
       if (window.electronAPI && file.path) openAddModalWithFile(file.path);
     };
@@ -176,6 +187,7 @@ export default function App() {
       {isSettingsOpen && <SettingsPanel />}
       {isVoiceChatOpen && <VoiceChatPanel />}
       {isStreamOpen && <StreamPanel />}
+      {isTtsOpen && <TtsPanel />}
       {isCollageOpen && <CollageStudio />}
       {isSetupOpen && <SetupWizard />}
       <UpdateBanner />

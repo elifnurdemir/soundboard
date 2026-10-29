@@ -106,7 +106,16 @@
           "target": "deb"
         }
       ]
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": "padopack",
+        "name": "Padoboard Ses Paketi",
+        "description": "Padoboard ses paketi",
+        "role": "Viewer",
+        "icon": "icon.ico"
+      }
+    ]
   },
   "dependencies": {
     "adm-zip": "^0.5.17",

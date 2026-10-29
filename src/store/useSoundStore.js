@@ -4,6 +4,7 @@ import { voiceChatRouter } from '../audio/VoiceChatRouter';
 import { audioEngine } from '../audio/AudioEngine';
 import useLicenseStore from './useLicenseStore';
 import { splitExpired, unreferencedFiles, orphanToSound } from './trash';
+import { normalizationGain, targetLufsFor } from '../audio/loudness';
 
 export const STOP_ALL_ID = '__stop_all__';
 
@@ -60,6 +61,9 @@ const DEFAULT_SETTINGS = {
   keyboardZoom: 1,
   stopAllShortcut: 'Ctrl+Alt+X', // her yerde çalışan "hepsini durdur" kısayolu
   buttonConcept: 'classic',      // buton konsepti: 'classic' | 'sokak'
+  normalize: false,              // sesleri eşitle: hepsi aynı algılanan yükseklikte çalar (LUFS)
+  normalizeTarget: 'normal',     // 'quiet' | 'normal' | 'loud' (bkz. LOUDNESS_TARGETS)
+  tts: { voiceId: '', rate: 1, pitch: 1 }, // yazıdan sese: son seçilen ses ve ayarlar
 };
 
 const DEFAULT_CATEGORIES = [
@@ -73,6 +77,18 @@ function buildAudioUrl(filePath) {
   const n = filePath.replace(/\\/g, '/');
   return /^[A-Za-z]:/.test(n) ? `file:///${n}` : `file://${n}`;
 }
+
+// Ölçüm hangi dosya ve kırpma için yapıldı: ses kırpılınca ya da dosyası değişince yeniden ölçülür
+export const loudnessKey = (s) => `${s.filePath}|${s.trimStart ?? 0}|${s.trimEnd ?? ''}`;
+
+// Eşitleme açıksa sesin çarpılacağı kazanç (ölçülmemişse 1)
+function normGain(sound, settings) {
+  if (!settings.normalize || sound.loudness?.key !== loudnessKey(sound)) return 1;
+  return normalizationGain(sound.loudness, targetLufsFor(settings.normalizeTarget));
+}
+
+// Çalma ses seviyesi en çok %100; eşitleme kazancı bunun üstüne uygulanır (tepe tavanı loudness.js'de)
+const playVolume = (sound, settings, norm) => Math.min(1, (sound.volume ?? 0.8) * (settings.globalVolume ?? 1)) * norm;
 
 // Ses kaydını varsayılanlarla tamamlar. Yeni ses eklerken ve çöp kutusundan geri alırken ortak kullanılır.
 function buildSound(data, order, theme) {
@@ -102,6 +118,7 @@ function buildSound(data, order, theme) {
     image: data.image || '',
     noColor: data.noColor ?? false,
     credit: data.credit || null, // çevrimiçi kaynaktan geldiyse yazar/lisans/kaynak bilgisi
+    loudness: data.loudness || null, // { lufs, peak, key } — eşitleme ölçümü
     createdAt: data.createdAt || Date.now(),
   };
 }
@@ -136,6 +153,7 @@ const useSoundStore = create((set, get) => ({
   isAddModalOpen: false,
   isVoiceChatOpen: false,
   isStreamOpen: false,
+  isTtsOpen: false,
   editingSound: null,
   pendingImportPath: null,
   isLoaded: false,
@@ -176,6 +194,7 @@ const useSoundStore = create((set, get) => ({
       // Sesleri önceden hazırla: ilk basışta decode beklenmesin (en çok çalınan önce)
       audioEngine.warm([...get().sounds].filter((s) => s.filePath).sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 300)
         .map((s) => ({ url: buildAudioUrl(s.filePath), trimStart: s.trimStart ?? 0, trimEnd: s.trimEnd ?? null }))).catch(() => {});
+      if (get().settings.normalize) get().analyzeAll();
       // Restore virtual device on router
       const { settings } = get();
       if (settings.voiceDeviceId) {
@@ -354,6 +373,39 @@ const useSoundStore = create((set, get) => ({
     get().saveData();
   },
 
+  // ─── Ses paketleri (.padopack) ───────────────────────────────────────────
+  exportCategoryPack: async (categoryId) => {
+    const { categories, sounds } = get();
+    const category = categories.find((c) => c.id === categoryId);
+    if (!category || !window.electronAPI?.exportPack) return;
+    const list = sounds.filter((s) => s.categoryId === categoryId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const res = await window.electronAPI.exportPack({ category, sounds: list });
+    if (res?.canceled) return;
+    if (!res?.success) { get().showToast(res?.error || 'Paket kaydedilemedi'); return; }
+    get().showToast(`"${category.name}" paketi kaydedildi: ${res.count} ses${res.skipped ? ` (${res.skipped} sesin dosyası bulunamadı)` : ''}`);
+  },
+
+  // filePath yoksa dosya seçme penceresi açılır. Paket her zaman yeni bir kategori olarak eklenir
+  importPack: async (filePath) => {
+    if (!window.electronAPI?.importPack) return;
+    const res = await window.electronAPI.importPack(filePath);
+    if (res?.canceled) return;
+    if (!res?.success) { get().showToast(res?.error || 'Paket yüklenemedi'); return; }
+    const { category, sounds: packSounds } = res.data;
+    const taken = new Set(get().categories.map((c) => c.name.toLocaleLowerCase('tr')));
+    let name = category.name, i = 2;
+    while (taken.has(name.toLocaleLowerCase('tr'))) name = `${category.name} (${i++})`;
+    const cat = { id: uuidv4(), name, color: category.color || randomColor(get().settings.theme) };
+    const theme = get().settings.theme;
+    let order = get().sounds.reduce((m, s) => Math.max(m, s.order ?? 0), -1);
+    const added = packSounds.map((d) => buildSound({ ...d, categoryId: cat.id }, ++order, theme));
+    set((state) => ({ categories: [...state.categories, cat], sounds: [...state.sounds, ...added], activeCategory: cat.id }));
+    added.forEach((s) => audioEngine.preload(buildAudioUrl(s.filePath), s.trimStart, s.trimEnd));
+    get().saveData();
+    if (get().settings.normalize) get().analyzeAll();
+    get().showToast(`"${name}" paketi yüklendi: ${added.length} ses`);
+  },
+
   setActiveCategory: (id) => set({ activeCategory: id }),
   setSearchQuery: (q) => set({ searchQuery: q }),
 
@@ -381,7 +433,13 @@ const useSoundStore = create((set, get) => ({
     }
 
     const url = buildAudioUrl(sound.filePath);
-    const targetVol = Math.min(1, (sound.volume ?? 0.8) * (settings.globalVolume ?? 1));
+    // Eşitleme açık ama ses henüz ölçülmediyse ilk çalışta ölçülür (bir kez; sonra kayıtta durur)
+    let measured = sound;
+    if (settings.normalize && sound.loudness?.key !== loudnessKey(sound)) {
+      measured = (await get().measureSound(sound.id)) || sound;
+    }
+    const norm = normGain(measured, settings);
+    const targetVol = playVolume(sound, settings, norm);
 
     // Pro-only effects — only applied for licensed users, even if a stale/tampered-with
     // sound record on disk carries non-default values (defense in depth, not just hiding the UI).
@@ -426,7 +484,7 @@ const useSoundStore = create((set, get) => ({
     set((state) => ({
       playingSounds: {
         ...state.playingSounds,
-        [sound.id]: [...(state.playingSounds[sound.id] || []), { voice }],
+        [sound.id]: [...(state.playingSounds[sound.id] || []), { voice, norm }],
       },
       cooldownTracker: { ...state.cooldownTracker, [sound.id]: now },
       sounds: state.sounds.map((s) => (s.id === sound.id ? { ...s, playCount: (s.playCount || 0) + 1 } : s)),
@@ -494,34 +552,70 @@ const useSoundStore = create((set, get) => ({
   updatePlayingVolume: (soundId, volume) => {
     const { playingSounds, settings } = get();
     const instances = playingSounds[soundId] || [];
-    const v = Math.min(1, volume * (settings.globalVolume ?? 1));
-    instances.forEach(({ voice }) => voice.setVolume(v));
+    instances.forEach(({ voice, norm }) => voice.setVolume(playVolume({ volume }, settings, norm ?? 1)));
+  },
+
+  // Sesin yüksekliğini ölçüp kaydına yazar. Dönen: güncel ses kaydı (ölçülemezse null)
+  measureSound: async (id) => {
+    const sound = get().sounds.find((s) => s.id === id);
+    if (!sound?.filePath) return null;
+    try {
+      const key = loudnessKey(sound);
+      const { lufs, peak } = await audioEngine.analyze(buildAudioUrl(sound.filePath), sound.trimStart ?? 0, sound.trimEnd ?? null);
+      // -Infinity JSON'a yazılamaz; tamamen sessiz ses null lufs ile saklanır (kazanç 1)
+      const loudness = { lufs: Number.isFinite(lufs) ? lufs : null, peak, key };
+      set((state) => ({ sounds: state.sounds.map((s) => (s.id === id ? { ...s, loudness } : s)) }));
+      return get().sounds.find((s) => s.id === id) || null;
+    } catch (e) {
+      console.warn(`Ölçülemedi "${sound.name}":`, e.message);
+      return null;
+    }
+  },
+
+  // Ölçülmemiş tüm sesleri arka planda sırayla ölçer (eşitleme açılınca ve açılışta)
+  _analyzing: false,
+  analyzeAll: async () => {
+    if (get()._analyzing) return;
+    set({ _analyzing: true });
+    try {
+      let changed = 0;
+      for (const s of get().sounds) {
+        if (!get().settings.normalize) break;
+        if (!s.filePath || s.loudness?.key === loudnessKey(s)) continue;
+        if (await get().measureSound(s.id)) changed++;
+        await new Promise((r) => setTimeout(r, 30)); // arayüz takılmasın
+      }
+      if (changed) get().saveData();
+    } finally {
+      set({ _analyzing: false });
+    }
   },
 
   // ─── UI State ────────────────────────────────────────────────────────────
   openSettings: () => set({ isSettingsOpen: true }),
   closeSettings: () => set({ isSettingsOpen: false }),
   openAddModal: (sound = null) => set({ isAddModalOpen: true, editingSound: sound }),
-  openAddModalWithFile: (filePath) => set({ isAddModalOpen: true, editingSound: null, pendingImportPath: filePath }),
-  closeAddModal: () => set({ isAddModalOpen: false, editingSound: null, pendingImportPath: null }),
+  openAddModalWithFile: (filePath, name = null) => set({ isAddModalOpen: true, editingSound: null, pendingImportPath: filePath, pendingImportName: name }),
+  closeAddModal: () => set({ isAddModalOpen: false, editingSound: null, pendingImportPath: null, pendingImportName: null }),
   openVoiceChat: () => set({ isVoiceChatOpen: true }),
   closeVoiceChat: () => set({ isVoiceChatOpen: false }),
   openStream: () => set({ isStreamOpen: true }),
   closeStream: () => set({ isStreamOpen: false }),
+  openTts: () => set({ isTtsOpen: true }),
+  closeTts: () => set({ isTtsOpen: false }),
 
   updateSettings: (updates) => {
     set((state) => ({ settings: { ...state.settings, ...updates } }));
     get().saveData();
 
     if ('globalVolume' in updates) {
-      const { playingSounds, sounds } = get();
+      const { playingSounds, sounds, settings } = get();
       sounds.forEach((s) => {
         const instances = playingSounds[s.id] || [];
-        instances.forEach(({ voice }) => {
-          voice.setVolume(Math.min(1, (s.volume ?? 0.8) * updates.globalVolume));
-        });
+        instances.forEach(({ voice, norm }) => voice.setVolume(playVolume(s, settings, norm ?? 1)));
       });
     }
+    if (updates.normalize) get().analyzeAll();
   },
 
   // ─── Helpers ─────────────────────────────────────────────────────────────

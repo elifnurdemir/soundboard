@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import useSoundStore from '../store/useSoundStore';
 
-function CategoryItem({ category, isActive, soundCount, onSelect, onEdit, onDelete }) {
+function CategoryItem({ category, isActive, soundCount, onSelect, onEdit, onDelete, onShare }) {
   const [showActions, setShowActions] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(category.name);
@@ -47,8 +47,23 @@ function CategoryItem({ category, isActive, soundCount, onSelect, onEdit, onDele
         {soundCount}
       </span>
 
-      {category.id !== 'default' && showActions && (
+      {showActions && (category.id !== 'default' || (onShare && soundCount > 0)) && (
         <div className="absolute right-1 flex gap-0.5 bg-app-raised border border-app-border p-0.5 shadow-lg z-10">
+          {onShare && soundCount > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onShare(category.id); }}
+              className="p-1 hover:bg-app-muted text-[#5c665a] hover:text-[#c4ff00]"
+              title="Paket olarak paylaş (.padopack)"
+              aria-label={`${category.name} kategorisini paket olarak paylaş`}
+            >
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                <polyline points="16 6 12 2 8 6"/>
+                <line x1="12" y1="2" x2="12" y2="15"/>
+              </svg>
+            </button>
+          )}
+          {category.id !== 'default' && (<>
           <button
             onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
             className="p-1 hover:bg-app-muted text-[#5c665a] hover:text-white"
@@ -71,6 +86,7 @@ function CategoryItem({ category, isActive, soundCount, onSelect, onEdit, onDele
               <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
             </svg>
           </button>
+          </>)}
         </div>
       )}
     </div>
@@ -78,7 +94,8 @@ function CategoryItem({ category, isActive, soundCount, onSelect, onEdit, onDele
 }
 
 export default function Sidebar() {
-  const { categories, sounds, trash, activeCategory, setActiveCategory, addCategory, updateCategory, deleteCategory } = useSoundStore();
+  const { categories, sounds, trash, activeCategory, setActiveCategory, addCategory, updateCategory, deleteCategory, exportCategoryPack, importPack } = useSoundStore();
+  const canPack = !!window.electronAPI?.exportPack;
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCatName, setNewCatName] = useState('');
 
@@ -186,6 +203,7 @@ export default function Sidebar() {
             onSelect={() => setActiveCategory(cat.id)}
             onEdit={updateCategory}
             onDelete={deleteCategory}
+            onShare={canPack ? exportCategoryPack : null}
           />
         ))}
 
@@ -211,6 +229,20 @@ export default function Sidebar() {
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
             + KATEGORİ
+          </button>
+        )}
+        {canPack && (
+          <button
+            onClick={() => importPack()}
+            title="Arkadaşının paylaştığı .padopack dosyasını yeni kategori olarak ekler"
+            className="flex items-center gap-2 px-3 py-2 cursor-pointer text-[#5c665a] hover:text-[#c4ff00] hover:bg-app-surface transition-all w-full mx-1 text-sm font-mono"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+              <polyline points="8 11 12 15 16 11"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            PAKET YÜKLE
           </button>
         )}
       </nav>

@@ -5,6 +5,9 @@ Sürüm numaraları [package.json](package.json) ile aynıdır. Her sürümün d
 ## 1.0.23 (hazırlanıyor)
 
 ### Yeni
+- **Sesleri eşitle** (Ayarlar → Ses): tüm butonlar aynı algılanan yükseklikte çalar (ITU-R BS.1770 LUFS ölçümü). Sakin / Normal / Yüksek hedefleri. Dosyalar değişmez; sessiz sesler en çok 12 dB ve tepe sınırına kadar yükseltilir, patlamaz.
+- **Ses paketleri (.padopack)**: bir kategoriyi sesleri, görselleri ve ayarlarıyla tek dosya olarak paylaş (kategori üstündeki paylaş düğmesi). Gelen paket çift tıklayarak, pencereye sürükleyerek ya da Kenar çubuğu → Paket yükle ile yeni kategori olarak eklenir. Kısayollar ve favoriler paylaşılmaz.
+- **Seslendir** (yazıdan sese): yazdığını Windows'un Türkçe sesiyle (Microsoft Tolga) arkadaşlarına okut, kendin dinle ya da butona kaydet. İnternet gerekmez. Linux'ta espeak-ng ile.
 - **Linux desteği** (deneysel): AppImage ve deb. Sanal mikrofon ve uygulama başına ses yönlendirme PulseAudio/PipeWire üzerinden `pactl` ile yapılır.
 - **İlk kurulum sihirbazı:** sanal kablo/mikrofon, test sesi ve Discord, Steam, oyun, OBS için mikrofon seçimi.
 - **Sorun bildir** butonu ve yerel hata günlüğü (Ayarlar → Hakkında). Hiçbir veri otomatik gönderilmez.

@@ -58,6 +58,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   offRoomPlay: () => ipcRenderer.removeAllListeners('room-play'),
   exportZip: (data) => ipcRenderer.invoke('export-zip', data),
   importZip: () => ipcRenderer.invoke('import-zip'),
+  ttsVoices: () => ipcRenderer.invoke('tts-voices'),
+  ttsSpeak: (opts) => ipcRenderer.invoke('tts-speak', opts),
+  exportPack: (data) => ipcRenderer.invoke('export-pack', data),
+  importPack: (filePath) => ipcRenderer.invoke('import-pack', filePath ?? null),
+  takePendingPack: () => ipcRenderer.invoke('take-pending-pack'),
+  onPackOpen: (cb) => ipcRenderer.on('pack-open', (_, p) => cb(p)),
+  offPackOpen: () => ipcRenderer.removeAllListeners('pack-open'),
 
   // Window controls
   minimize: () => ipcRenderer.invoke('window:minimize'),

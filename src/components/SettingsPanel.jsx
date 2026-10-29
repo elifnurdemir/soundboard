@@ -1,8 +1,69 @@
 import { useState, useEffect } from "react";
-import useSoundStore from "../store/useSoundStore";
+import useSoundStore, { loudnessKey } from "../store/useSoundStore";
 import useLicenseStore, { LICENSING_ENABLED } from "../store/useLicenseStore";
 import ProGate from "./ProGate";
 import { ShortcutInput } from "./AddSoundModal";
+import { LOUDNESS_TARGETS } from "../audio/loudness";
+
+// Sesleri eşitle: açıkken her ses aynı algılanan yükseklikte çalar (LUFS ölçümü, bkz. audio/loudness.js)
+function NormalizeSetting() {
+  const settings = useSoundStore((s) => s.settings);
+  const updateSettings = useSoundStore((s) => s.updateSettings);
+  const total = useSoundStore((s) => s.sounds.filter((x) => x.filePath).length);
+  const measured = useSoundStore((s) => s.sounds.filter((x) => x.loudness?.key === loudnessKey(x)).length);
+  const on = !!settings.normalize;
+  return (
+    <div className="p-3 bg-app-surface border border-app-border space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-white">Sesleri Eşitle</p>
+          <p className="text-xs font-mono mt-0.5" style={{ color: "#5c665a" }}>
+            Fısıltı gibi kalan ya da kulak patlatan sesler aynı yükseklikte çalar. Dosyalar değişmez.
+          </p>
+        </div>
+        <button
+          type="button" role="switch" aria-checked={on} aria-label="Sesleri eşitle"
+          onClick={() => updateSettings({ normalize: !on })}
+          className="relative w-11 h-6 shrink-0 transition-colors"
+          style={{ background: on ? "var(--accent)" : "#1a1e1a", border: "1px solid #252b25" }}
+        >
+          <span
+            className="absolute top-0.5 w-5 h-5 transition-all"
+            style={{ left: on ? "calc(100% - 22px)" : "2px", background: on ? "#0b0d0b" : "#5c665a" }}
+          />
+        </button>
+      </div>
+      {on && (
+        <>
+          <div className="flex gap-1.5">
+            {LOUDNESS_TARGETS.map((t) => {
+              const active = (settings.normalizeTarget || "normal") === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => updateSettings({ normalizeTarget: t.id })}
+                  title={`${t.lufs} LUFS`}
+                  className="flex-1 py-1.5 border text-xs font-bold font-mono tracking-wider transition-colors"
+                  style={{
+                    borderColor: active ? "var(--accent)" : "var(--border)",
+                    background: active ? "rgba(196,255,0,0.1)" : "var(--input)",
+                    color: active ? "var(--accent)" : "#8e9c8b",
+                  }}
+                >
+                  {t.label.toLocaleUpperCase("tr")}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px] font-mono" style={{ color: "#5c665a" }}>
+            {measured < total ? `Sesler ölçülüyor: ${measured} / ${total}` : `${total} sesin hepsi ölçüldü.`}
+            {" "}Butondaki ses seviyesi sürgüsü eşitlemenin üstüne uygulanır.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
 
 function UpdateChecker() {
   const [status, setStatus] = useState('idle'); // idle | checking | latest | available | downloading | ready
@@ -359,6 +420,8 @@ export default function SettingsPanel() {
                 className="w-28 volume-slider"
               />
             </Row>
+
+            <NormalizeSetting />
 
             <div className="p-3 bg-app-surface border border-app-border space-y-2">
               <p className="text-sm font-medium text-white">Hepsini Durdur Kısayolu</p>

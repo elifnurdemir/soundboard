@@ -31,7 +31,7 @@ function WindowControls() {
 export default function Header() {
   const {
     openAddModal, openSettings, stopAllSounds, playingSounds,
-    openVoiceChat, openStream, setSearchQuery, searchQuery,
+    openVoiceChat, openStream, openTts, setSearchQuery, searchQuery,
     settings, updateSettings,
   } = useSoundStore();
   const volume = settings.globalVolume ?? 1;
@@ -145,6 +145,21 @@ export default function Header() {
           </svg>
           STÜDYO
         </button>
+
+        {/* Yazıdan sese */}
+        {window.electronAPI?.ttsSpeak && (
+          <button
+            onClick={openTts}
+            className="h-8 px-2.5 flex items-center gap-1.5 text-[11px] font-bold font-mono tracking-wider text-[#5c665a] hover:text-[#c4ff00] hover:bg-app-surface transition-colors"
+            title="Seslendir: yazdığını arkadaşlarına okut"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              <line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/>
+            </svg>
+            <span className="hidden xl:inline">SESLENDİR</span>
+          </button>
+        )}
 
         {/* Voice Chat */}
         <button

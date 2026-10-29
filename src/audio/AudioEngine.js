@@ -1,3 +1,5 @@
+import { measureLoudness } from './loudness';
+
 /**
  * AudioEngine — tek bir AudioContext üzerinden çalma.
  *
@@ -95,6 +97,7 @@ class AudioEngine {
     this._sizes = new Map(); // anahtar → bayt
     this._inflight = new Map(); // url → Promise<AudioBuffer> (aynı dosya iki kez çözülmesin)
     this._warming = false;
+    this._loudness = new Map(); // anahtar → Promise<{ lufs, peak }>
   }
 
   _ensure() {
@@ -229,6 +232,24 @@ class AudioEngine {
     });
     p.catch(() => { this._buffers.delete(key); this._sizes.delete(key); });
     this._buffers.set(key, p);
+    return p;
+  }
+
+  /**
+   * Kırpılmış sesin algılanan yüksekliğini ölçer (LUFS, bkz. loudness.js). Aynı ses için bir kez hesaplanır.
+   * Uzun dosyalarda birkaç yüz ms sürebilir; çağıran sonucu sesin kaydına yazar, her açılışta yeniden ölçülmez.
+   */
+  analyze(url, trimStart = 0, trimEnd = null) {
+    const key = url + '|' + trimStart + '|' + trimEnd;
+    let p = this._loudness.get(key);
+    if (p) return p;
+    p = this._prepare(url, trimStart, trimEnd).then((buf) => {
+      const channels = [];
+      for (let c = 0; c < buf.numberOfChannels; c++) channels.push(buf.getChannelData(c));
+      return measureLoudness(channels, buf.sampleRate);
+    });
+    p.catch(() => this._loudness.delete(key));
+    this._loudness.set(key, p);
     return p;
   }
 

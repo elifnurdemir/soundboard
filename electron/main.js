@@ -199,8 +199,11 @@ app.whenReady().then(() => {
     setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 4 * 60 * 60 * 1000);
   }
 
-  app.on('second-instance', () => {
+  app.on('second-instance', (_, argv) => {
     if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
+    // Uygulama açıkken bir .padopack dosyasına çift tıklandı
+    const pack = packFromArgv(argv);
+    if (pack) mainWindow?.webContents.send('pack-open', pack);
   });
 
   app.on('activate', () => {
@@ -1020,6 +1023,75 @@ ipcMain.handle('install-update', () => {
 
 // ─── Window Controls ──────────────────────────────────────────────────────────
 ipcMain.handle('get-app-version', () => app.getVersion());
+
+// ─── Yazıdan sese ─────────────────────────────────────────────────────────────
+// Geçici dosyalar burada; "Butona ekle" denince ses klasörüne kopyalanır. Açılışta temizlenir.
+const tts = require('./tts');
+const getTtsFolder = () => path.join(app.getPath('userData'), 'tts-temp');
+app.whenReady().then(() => tts.cleanup(getTtsFolder()));
+ipcMain.handle('tts-voices', async () => {
+  try { return { success: true, ...(await tts.listVoices()) }; } catch (err) {
+    log.error('tts', 'Sesler listelenemedi', err.message);
+    return { success: false, error: err.message, voices: [] };
+  }
+});
+ipcMain.handle('tts-speak', async (_, opts) => {
+  try { return { success: true, filePath: await tts.synthesize(opts || {}, getTtsFolder()) }; } catch (err) {
+    log.error('tts', 'Seslendirilemedi', err.message);
+    return { success: false, error: err.message };
+  }
+});
+
+// ─── Ses paketi (.padopack) ───────────────────────────────────────────────────
+// Paket başkasından gelir: doğrulama ve güvenli yazma pack.js'de
+const packs = require('./pack');
+const isPackFile = (p) => typeof p === 'string' && /\.padopack$/i.test(p) && fs.existsSync(p);
+const packFromArgv = (argv) => (argv || []).slice(1).find(isPackFile) || null;
+// İlk açılışta çift tıklanan paket, arayüz hazır olunca bir kez alınır
+let pendingPack = packFromArgv(process.argv);
+ipcMain.handle('take-pending-pack', () => { const p = pendingPack; pendingPack = null; return p; });
+
+ipcMain.handle('export-pack', async (_, { category, sounds }) => {
+  if (!mainWindow) return { success: false };
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    title: 'Ses paketini kaydet',
+    defaultPath: `${safeFileBase(category?.name || 'Ses paketi')}.padopack`,
+    filters: [{ name: 'Padoboard ses paketi', extensions: ['padopack'] }],
+  });
+  if (canceled || !filePath) return { success: false, canceled: true };
+  try {
+    const { buffer, count, skipped } = packs.buildPack({ category, sounds: Array.isArray(sounds) ? sounds : [], appVersion: app.getVersion() });
+    if (!count) return { success: false, error: 'Bu kategoride paketlenecek ses dosyası yok' };
+    fs.writeFileSync(filePath, buffer);
+    return { success: true, filePath, count, skipped };
+  } catch (err) {
+    log.error('pack', 'Paket oluşturulamadı', err.stack || err.message);
+    return { success: false, error: err.message };
+  }
+});
+
+// filePath verilmezse dosya seçme penceresi açılır (çift tıklama ve sürükle-bırakta yol gelir)
+ipcMain.handle('import-pack', async (_, givenPath) => {
+  let filePath = givenPath;
+  if (filePath == null) {
+    if (!mainWindow) return { success: false };
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: 'Ses paketi yükle',
+      filters: [{ name: 'Padoboard ses paketi', extensions: ['padopack'] }],
+      properties: ['openFile'],
+    });
+    if (canceled || !filePaths.length) return { success: false, canceled: true };
+    filePath = filePaths[0];
+  }
+  if (!isPackFile(filePath)) return { success: false, error: 'Dosya bir .padopack paketi değil' };
+  try {
+    const data = packs.readPack(filePath, { soundsDir: getSoundsFolder(), imagesDir: path.join(app.getPath('userData'), 'images') });
+    return { success: true, data };
+  } catch (err) {
+    if (!(err instanceof packs.PackError)) log.error('pack', 'Paket açılamadı', err.stack || err.message);
+    return { success: false, error: err instanceof packs.PackError ? err.message : 'Paket açılamadı' };
+  }
+});
 
 // ─── Export / Import ──────────────────────────────────────────────────────────
 ipcMain.handle('export-zip', async (_, { categories, sounds, settings }) => {

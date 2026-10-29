@@ -296,10 +296,11 @@ export default function AddSoundModal() {
 
   // Picked up via a global drop onto the main window (see App.jsx) before this modal opened.
   useEffect(() => {
-    const pending = useSoundStore.getState().pendingImportPath;
+    const { pendingImportPath: pending, pendingImportName } = useSoundStore.getState();
     if (pending) {
-      useSoundStore.setState({ pendingImportPath: null });
-      importFromPath(pending);
+      useSoundStore.setState({ pendingImportPath: null, pendingImportName: null });
+      // Seslendirmeden gelince buton adı dosya adı değil, okunan metin olsun
+      importFromPath(pending).then(() => { if (pendingImportName) setName(pendingImportName); });
     }
   }, []);
 
